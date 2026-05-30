@@ -16,6 +16,6 @@ struct displaypost{
 
 void initfeed();
 void tambahpostingan(std :: string usern, std :: string capt);
-displaypost refresview();
+displaypost refreshview();
 displaypost scrollbawah();
 displaypost scrollatas();

@@ -738,28 +738,38 @@ void SocialMedia::seedDemoData()
     registerUser("haikal", "12345");
     registerUser("dzaky", "12345");
     registerUser("rayyan", "12345");
+    registerUser("mahfuzh", "12345");
+    registerUser("nala", "12345");
+
 
     updateProfile("haikal", "Mahasiswa Informatika - suka struktur data 🌳", "🧠");
     updateProfile("dzaky", "Backend engineer", "🚀");
     updateProfile("rayyan", "UI/UX enthusiast", "🎨");
+    updateProfile("mahfuzh", "Cybersecurity enthusiast", "💻");
+    updateProfile("nala", "Data science enthusiast", "📊");
+    updateProfile("saragih", "master of physics", "⚒️");
+
 
     followUser("haikal", "dzaky");
     followUser("haikal", "rayyan");
     followUser("dzaky", "rayyan");
     followUser("rayyan", "haikal");
+    followUser("nala", "dzaky");
+    followUser("saragih", "haikal");
+    followUser("dzaky", "haikal");
+    followUser("haikal", "saragih");
+    followUser("saragih", "dzaky");
+    followUser("dzaky", "saragih");
 
     addPost("haikal", "Hari ini ngoding doubly linked list. Mind-blown 🤯 #strukturdata #cpp");
     addPost("dzaky", "Priority queue itu seru banget buat antrian pasien 🏥 #priorityqueue #strukturdata");
     addPost("rayyan", "UI Qt makin mantap setelah belajar QStackedWidget. #qt #ui");
     addPost("haikal", "Lagi cobain bikin sosmed pakai Qt! 🤩 #qt #project");
 
-    toggleLike("dzaky", 1);
-    toggleLike("haikal", 1);
-    toggleLike("rayyan", 2);
-    toggleLike("dzaky", 4);
-
-    addComment("dzaky", 1, "Siap pak, semangat!");
-    addComment("haikal", 1, "Sudah baca materinya, top!");
+    toggleLike("dzaky", 10);
+    toggleLike("haikal", 50);
+    toggleLike("rayyan", 8);
+    toggleLike("dzaky", 67);
 
     sendMessage("haikal", "dzaky", "Bro, udah ngerjain tugas struktur data?");
     sendMessage("dzaky", "haikal", "Belum, lagi baca slide-nya nih");

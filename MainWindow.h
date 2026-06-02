@@ -106,8 +106,7 @@ private:
     QLabel* meBadgeAvatar_;
     QLabel* meBadgeName_;
     QPushButton* logoutBtn_;
-    QVBoxLayout* trendingLayout_;
-    QVBoxLayout* suggestionsLayout_;
+    QScrollArea* rightScroll_;
 
     QTextEdit* composer_;
     QPushButton* composerPostBtn_;
@@ -139,6 +138,7 @@ private:
     QPushButton* profileFollowBtn_;
     QPushButton* profileMessageBtn_;
     QVBoxLayout* profilePostsLayout_;
+    QScrollArea* profileRelScroll_;
     QVBoxLayout* profileFollowingLayout_;
     QVBoxLayout* profileFollowersLayout_;
 

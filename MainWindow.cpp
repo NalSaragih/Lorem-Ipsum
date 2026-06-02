@@ -66,8 +66,7 @@ MainWindow::MainWindow(QWidget* parent)
     , meBadgeAvatar_(new QLabel)
     , meBadgeName_(new QLabel)
     , logoutBtn_(new QPushButton("Keluar"))
-    , trendingLayout_(nullptr)
-    , suggestionsLayout_(nullptr)
+    , rightScroll_(nullptr)
     , composer_(new QTextEdit)
     , composerPostBtn_(new QPushButton("Posting"))
     , homeFeedLayout_(nullptr)
@@ -93,6 +92,7 @@ MainWindow::MainWindow(QWidget* parent)
     , profileFollowBtn_(new QPushButton("Follow"))
     , profileMessageBtn_(new QPushButton("Pesan"))
     , profilePostsLayout_(nullptr)
+    , profileRelScroll_(nullptr)
     , profileFollowingLayout_(nullptr)
     , profileFollowersLayout_(nullptr)
     , searchResultsLayout_(nullptr)
@@ -495,43 +495,14 @@ QWidget* MainWindow::buildRightPanel() {
     right->setStyleSheet(QStringLiteral(
         "QWidget#rightPanel { background:%1; border-left:1.5px solid %2; }").arg(kCard, kBorder));
 
-    auto* scroll = new QScrollArea(right);
-    scroll->setWidgetResizable(true);
-    scroll->setFrameShape(QFrame::NoFrame);
+    rightScroll_ = new QScrollArea(right);
+    rightScroll_->setWidgetResizable(true);
+    rightScroll_->setFrameShape(QFrame::NoFrame);
+    rightScroll_->setWidget(new QWidget);
 
-    auto* container = new QWidget;
-    auto* layout = new QVBoxLayout(container);
-    layout->setContentsMargins(4, 14, 12, 14);
-    layout->setSpacing(12);
-
-    auto mkCard = [&](const QString& title, const QString& desc, QVBoxLayout*& contentLayout) {
-        auto* card = new QFrame;
-        card->setStyleSheet(cardStyle());
-        auto* cl = new QVBoxLayout(card);
-        cl->setContentsMargins(14, 12, 14, 14);
-        cl->setSpacing(6);
-        auto* t = new QLabel(title);
-        t->setStyleSheet("font-weight:800; font-size:14px;");
-        cl->addWidget(t);
-        if (!desc.isEmpty()) {
-            auto* d = new QLabel(desc);
-            d->setStyleSheet(QStringLiteral("color:%1; font-size:11px;").arg(kMuted));
-            cl->addWidget(d);
-        }
-        contentLayout = new QVBoxLayout;
-        contentLayout->setSpacing(4);
-        cl->addLayout(contentLayout);
-        return card;
-    };
-
-    layout->addWidget(mkCard("🔥  Trending", "Diranking via Binary Search Tree", trendingLayout_));
-    layout->addWidget(mkCard("🤝  Mungkin kamu kenal", "Saran via BFS pada graph following", suggestionsLayout_));
-    layout->addStretch();
-
-    scroll->setWidget(container);
     auto* outer = new QVBoxLayout(right);
     outer->setContentsMargins(0, 0, 0, 0);
-    outer->addWidget(scroll);
+    outer->addWidget(rightScroll_);
     return right;
 }
 
@@ -833,39 +804,14 @@ QWidget* MainWindow::buildProfilePage() {
     postsOuter->addStretch();
     postsScroll->setWidget(postsContainer);
 
-    auto* relCol = new QVBoxLayout;
-    relCol->setSpacing(12);
-
-    auto mkRelCard = [&](const QString& title, QVBoxLayout*& target) {
-        auto* card = new QFrame;
-        card->setStyleSheet(cardStyle());
-        auto* cl = new QVBoxLayout(card);
-        cl->setContentsMargins(14, 12, 14, 12);
-        auto* t = new QLabel(title);
-        t->setStyleSheet("font-weight:800; font-size:13px;");
-        cl->addWidget(t);
-        target = new QVBoxLayout;
-        target->setSpacing(4);
-        cl->addLayout(target);
-        return card;
-    };
-
-    relCol->addWidget(mkRelCard("➡️  Following", profileFollowingLayout_));
-    relCol->addWidget(mkRelCard("⬅️  Followers", profileFollowersLayout_));
-    relCol->addStretch();
-
-    auto* relScroll = new QScrollArea;
-    relScroll->setWidgetResizable(true);
-    relScroll->setFrameShape(QFrame::NoFrame);
-    auto* relContainer = new QWidget;
-    auto* relContainerLayout = new QVBoxLayout(relContainer);
-    relContainerLayout->setContentsMargins(0, 0, 0, 0);
-    relContainerLayout->addLayout(relCol);
-    relScroll->setWidget(relContainer);
-    relScroll->setFixedWidth(256);
+    profileRelScroll_ = new QScrollArea;
+    profileRelScroll_->setWidgetResizable(true);
+    profileRelScroll_->setFrameShape(QFrame::NoFrame);
+    profileRelScroll_->setWidget(new QWidget);
+    profileRelScroll_->setFixedWidth(256);
 
     contentRow->addWidget(postsScroll, 1);
-    contentRow->addWidget(relScroll);
+    contentRow->addWidget(profileRelScroll_);
 
     layout->addWidget(headerCard);
     layout->addLayout(contentRow, 1);
@@ -1330,25 +1276,57 @@ void MainWindow::refreshProfile() {
 
     renderPostsInto(profilePostsLayout_, sm_.getPostsBy(viewingProfile_));
 
-    clearLayout(profileFollowingLayout_);
+    if (!profileRelScroll_) return;
+
+    auto* relContainer = new QWidget;
+    auto* relLayout = new QVBoxLayout(relContainer);
+    relLayout->setContentsMargins(0, 4, 0, 4);
+    relLayout->setSpacing(12);
+
+    auto mkRelCard = [&](const QString& title) -> QVBoxLayout* {
+        auto* card = new QFrame;
+        card->setStyleSheet(cardStyle());
+        auto* cl = new QVBoxLayout(card);
+        cl->setContentsMargins(14, 12, 14, 14);
+        cl->setSpacing(6);
+        auto* t = new QLabel(title);
+        t->setStyleSheet("font-weight:800; font-size:13px; background:transparent;");
+        cl->addWidget(t);
+        auto* content = new QVBoxLayout;
+        content->setSpacing(4);
+        cl->addLayout(content);
+        relLayout->addWidget(card);
+        return content;
+    };
+
+    auto* followingContent = mkRelCard("➡️  Following");
     auto following = sm_.getFollowing(viewingProfile_);
     if (following.isEmpty()) {
-        auto* empty = new QLabel("Belum mengikuti siapapun");
-        empty->setStyleSheet(QStringLiteral("color:%1; font-size:12px;").arg(kMuted));
-        profileFollowingLayout_->addWidget(empty);
+        auto* e = new QLabel("Belum mengikuti siapapun");
+        e->setStyleSheet(QStringLiteral("color:%1; font-size:12px; background:transparent;").arg(kMuted));
+        followingContent->addWidget(e);
     }
     for (const auto& f : following)
-        profileFollowingLayout_->addWidget(makeUserCard(f, "", false));
+        followingContent->addWidget(makeUserCard(f, "", false));
 
-    clearLayout(profileFollowersLayout_);
+    auto* followersContent = mkRelCard("⬅️  Followers");
     auto followers = sm_.getFollowers(viewingProfile_);
     if (followers.isEmpty()) {
-        auto* empty = new QLabel("Belum ada followers");
-        empty->setStyleSheet(QStringLiteral("color:%1; font-size:12px;").arg(kMuted));
-        profileFollowersLayout_->addWidget(empty);
+        auto* e = new QLabel("Belum ada followers");
+        e->setStyleSheet(QStringLiteral("color:%1; font-size:12px; background:transparent;").arg(kMuted));
+        followersContent->addWidget(e);
     }
     for (const auto& f : followers)
-        profileFollowersLayout_->addWidget(makeUserCard(f, "", false));
+        followersContent->addWidget(makeUserCard(f, "", false));
+
+    relLayout->addStretch();
+
+    auto* oldRel = profileRelScroll_->takeWidget();
+    if (oldRel) oldRel->deleteLater();
+    profileRelScroll_->setWidget(relContainer);
+
+    profileFollowingLayout_ = followingContent;
+    profileFollowersLayout_ = followersContent;
 }
 
 void MainWindow::refreshSearch() {
@@ -1372,54 +1350,85 @@ void MainWindow::refreshSearch() {
 }
 
 void MainWindow::refreshRightPanel() {
-    if (currentUser_.isEmpty()) return;
+    if (currentUser_.isEmpty() || !rightScroll_) return;
 
-    clearLayout(trendingLayout_);
+    auto* container = new QWidget;
+    auto* layout = new QVBoxLayout(container);
+    layout->setContentsMargins(4, 14, 12, 14);
+    layout->setSpacing(12);
+
+    auto mkSection = [&](const QString& title, const QString& desc) -> QVBoxLayout* {
+        auto* card = new QFrame;
+        card->setStyleSheet(cardStyle());
+        auto* cl = new QVBoxLayout(card);
+        cl->setContentsMargins(14, 12, 14, 14);
+        cl->setSpacing(6);
+        auto* t = new QLabel(title);
+        t->setStyleSheet("font-weight:800; font-size:14px; background:transparent;");
+        cl->addWidget(t);
+        if (!desc.isEmpty()) {
+            auto* d = new QLabel(desc);
+            d->setStyleSheet(QStringLiteral(
+                "color:%1; font-size:11px; background:transparent;").arg(kMuted));
+            cl->addWidget(d);
+        }
+        auto* content = new QVBoxLayout;
+        content->setSpacing(4);
+        cl->addLayout(content);
+        layout->addWidget(card);
+        return content;
+    };
+
+    auto* trendLayout = mkSection("🔥  Trending", "Diranking via Binary Search Tree");
+    static const char* rankColors[] = {
+        "#E53E3E","#DD6B20","#D69E2E","#38A169","#3182CE","#805AD5","#D53F8C","#2B6CB0"
+    };
     auto trends = sm_.getTrendingTopics(8);
     if (trends.isEmpty()) {
-        auto* empty = new QLabel("Belum ada trending.");
-        empty->setStyleSheet(QStringLiteral("color:%1; font-size:12px;").arg(kMuted));
-        trendingLayout_->addWidget(empty);
+        auto* e = new QLabel("Belum ada trending.");
+        e->setStyleSheet(QStringLiteral("color:%1; font-size:12px; background:transparent;").arg(kMuted));
+        trendLayout->addWidget(e);
     }
-    static const char* rankColors[] = { "#E53E3E","#DD6B20","#D69E2E","#38A169","#3182CE","#805AD5","#D53F8C","#2B6CB0" };
-    int rank = 0;
-    for (const auto& t : trends) {
+    for (int rank = 0; rank < trends.size(); ++rank) {
+        const auto& t = trends[rank];
         auto* row = new QFrame;
         row->setStyleSheet(QStringLiteral(
             "QFrame { background:%1; border:1px solid %2; border-radius:10px; }").arg(kBg, kBorder));
         auto* rl = new QHBoxLayout(row);
         rl->setContentsMargins(10, 7, 10, 7);
         rl->setSpacing(10);
-
         auto* chip = new QLabel(QString::number(rank + 1));
         chip->setFixedSize(22, 22);
         chip->setAlignment(Qt::AlignCenter);
-        const char* cc = rankColors[rank < 8 ? rank : 7];
         chip->setStyleSheet(QStringLiteral(
-            "background:%1; color:white; border-radius:11px; font-weight:800; font-size:11px;").arg(cc));
-
+            "background:%1; color:white; border-radius:11px; font-weight:800; font-size:11px;")
+            .arg(rankColors[rank < 8 ? rank : 7]));
         auto* topicLabel = new QLabel(t.first);
         topicLabel->setStyleSheet("font-weight:700; font-size:12px; background:transparent;");
         auto* scoreLabel = new QLabel(QStringLiteral("%1").arg(t.second));
         scoreLabel->setStyleSheet(QStringLiteral(
             "color:%1; font-size:10px; background:transparent;").arg(kMuted));
-
         rl->addWidget(chip);
         rl->addWidget(topicLabel, 1);
         rl->addWidget(scoreLabel);
-        trendingLayout_->addWidget(row);
-        ++rank;
+        trendLayout->addWidget(row);
     }
 
-    clearLayout(suggestionsLayout_);
+    auto* sugLayout = mkSection("🤝  Mungkin kamu kenal", "Saran via BFS pada graph following");
     auto sugs = sm_.getFollowSuggestions(currentUser_, 5);
     if (sugs.isEmpty()) {
-        auto* empty = new QLabel("Tidak ada saran saat ini.");
-        empty->setStyleSheet(QStringLiteral("color:%1; font-size:12px;").arg(kMuted));
-        suggestionsLayout_->addWidget(empty);
+        auto* e = new QLabel("Tidak ada saran saat ini.");
+        e->setStyleSheet(QStringLiteral("color:%1; font-size:12px; background:transparent;").arg(kMuted));
+        sugLayout->addWidget(e);
     }
     for (const auto& u : sugs)
-        suggestionsLayout_->addWidget(makeUserCard(u, sm_.getUser(u).bio, true));
+        sugLayout->addWidget(makeUserCard(u, sm_.getUser(u).bio, true));
+
+    layout->addStretch();
+
+    auto* oldWidget = rightScroll_->takeWidget();
+    if (oldWidget) oldWidget->deleteLater();
+    rightScroll_->setWidget(container);
 }
 
 QWidget* MainWindow::makeUserCard(const QString& username, const QString& subtitle, bool showFollow) {

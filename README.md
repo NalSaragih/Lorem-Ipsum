@@ -22,8 +22,8 @@ Kami memilih struktur data tertentu berdasarkan efisiensi algoritma dan fungsion
 | **Pesan (Chat)** | `Linked List` | Memungkinkan penambahan pesan secara dinamis tanpa batas ukuran (seperti *array*) dan memudahkan navigasi riwayat. |
 | **Following** | `Graph` | Representasi hubungan antar pengguna (Node & Edge). Sangat efisien untuk fitur *friend suggestion*. |
 | **Feed Postingan** | `Doubly Linked List` | Memudahkan pengguna untuk *scrolling* maju ke postingan lama atau kembali ke postingan terbaru ($O(1)$). |
-| **Like & Undo** | `Stack` (Tumpukan) | Menggunakan prinsip **LIFO** (Last-In, First-Out). Aksi terakhir (Like) berada di puncak tumpukan sehingga mudah untuk di-`pop` (Undo). |
-| **Trending Topic** | `Max-Heap Tree` | Menempatkan konten dengan interaksi tertinggi di posisi *root*. Operasi pengambilan data terpopuler sangat cepat ($O(1)$). |
+| **Like & Aktivitas** | `Stack` (Tumpukan) | Menggunakan prinsip **LIFO** (Last-In, First-Out). Aksi terbaru berada di puncak tumpukan sebagai riwayat aktivitas pengguna. |
+| **Trending Topic** | `Priority Tree` | Menempatkan topik dengan interaksi tertinggi pada urutan prioritas teratas berdasarkan skor. |
 
 ---
 
@@ -41,11 +41,23 @@ Kami menggunakan **Directed Graph** menggunakan *Adjacency List*. Jika User A me
 ### 4. Feed & Navigasi Postingan
 Dengan **Doubly Linked List**, setiap objek postingan memiliki pointer `next` dan `prev`. Ini mensimulasikan pengalaman pengguna saat menggeser layar ke atas dan ke bawah dengan akses memori yang instan.
 
-### 5. Fitur Like & Batal (Stack)
-Logika "Batal Like" bekerja seperti fitur *Undo*. Aksi Like terakhir disimpan di paling atas. Jika pengguna menekan tombol batal, sistem hanya perlu melakukan operasi `pop()` pada tumpukan tersebut.
+### 5. Fitur Like & Aktivitas (Stack)
+Setiap aksi seperti Like, Unlike, Follow, Unfollow, Post, Delete Post, Comment, dan Delete Comment dimasukkan ke dalam Stack sebagai riwayat aktivitas. Aksi terbaru selalu berada di `top`, sehingga prinsip **LIFO** tetap terlihat tanpa perlu menghapus elemen di tengah.
 
-### 6. Algoritma Trending (Priority Queue/Heap)
-Topik yang sedang tren dihitung berdasarkan bobot (Like + Komen). Kami menggunakan **Max-Heap** agar sistem selalu bisa menampilkan konten paling viral di halaman utama tanpa harus mengurutkan ulang seluruh data secara manual ($O(\log n)$ untuk setiap perubahan data).
+### 6. Algoritma Trending (Priority Tree)
+Topik yang sedang tren dihitung berdasarkan bobot (Post + Like). Pada integrasi Qt, prioritas trending direpresentasikan dengan tree berbasis skor sehingga topik dengan skor tertinggi dapat ditampilkan lebih dulu.
+
+---
+
+## Integrasi ke SocialMediaQt
+File `action.hpp/.cpp`, `feed.hpp/.cpp`, `Notifikasi.hpp/.cpp`, dan `chat.hpp/.cpp` dipakai oleh aplikasi Qt melalui `LoremIpsumBridge`.
+
+Bridge ini mengadaptasi struktur data C++ asli ke tipe Qt (`QString`, `QVector`) agar bisa dipakai oleh UI tanpa mengubah prinsip struktur data:
+
+* `feed.cpp` → mirror feed postingan berbasis Doubly Linked List.
+* `action.cpp` → mirror Stack aktivitas terbaru.
+* `Notifikasi.cpp` → mirror Queue notifikasi FIFO.
+* `chat.cpp` → mirror Linked List riwayat pesan.
 
 ---
 

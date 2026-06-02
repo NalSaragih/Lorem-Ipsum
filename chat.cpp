@@ -1,5 +1,7 @@
 #include "chat.hpp"
 
+namespace lorem {
+
 nodechat* head = nullptr;
 nodechat* tail = nullptr;
 nodechat* currentchat = nullptr; 
@@ -57,4 +59,6 @@ displaychat bacaselanjutnya(){
     currentchat = currentchat->next;
 
     return kirimdata;
+}
+
 }

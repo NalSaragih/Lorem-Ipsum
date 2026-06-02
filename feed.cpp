@@ -1,8 +1,10 @@
 #include "feed.hpp"
 
-nodepost* head = nullptr;
-nodepost* tail = nullptr;
-nodepost* currentfeed = nullptr;
+namespace lorem {
+
+static nodepost* head = nullptr;
+static nodepost* tail = nullptr;
+static nodepost* currentfeed = nullptr;
 
 
 void initfeed(){
@@ -57,4 +59,6 @@ displaypost scrollatas(){
         currentfeed = currentfeed->prev;
     }
     return getDisplaydata();
+}
+
 }

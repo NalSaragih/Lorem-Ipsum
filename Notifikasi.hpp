@@ -1,7 +1,8 @@
 #pragma once
 #include <string>
 
-/* ini file hpp untuk queue notifikasi*/
+namespace lorem {
+
 struct nodeNotifikasi{
     std :: string username;
     std :: string isiNotif;
@@ -14,14 +15,11 @@ struct displayNotif{
     bool isEmpty;
 };
 
-void initqueue();  //inisialisasi queue
-void notifmasuk(std :: string usern, std :: string isiN); // tambah notif
-void hapusNotif(); // hapus notif
-displayNotif lihatNotif(); // lihat notif paling atas
-displayNotif bacanotif(); // lihat dan hapus
-bool checkEmpty(); //check apakah kosong
+void initqueue();
+void notifmasuk(std :: string usern, std :: string isiN);
+void hapusNotif();
+displayNotif lihatNotif();
+displayNotif bacanotif();
+bool checkEmpty();
 
-
-
-
-
+}

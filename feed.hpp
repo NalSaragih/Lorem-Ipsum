@@ -1,6 +1,8 @@
 #pragma once
 #include <string>
 
+namespace lorem {
+
 struct nodepost{
     std :: string username;
     std :: string caption;
@@ -19,3 +21,5 @@ void tambahpostingan(std :: string usern, std :: string capt);
 displaypost refreshview();
 displaypost scrollbawah();
 displaypost scrollatas();
+
+}

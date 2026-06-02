@@ -1,58 +1,75 @@
 #include "Notifikasi.hpp"
 
-nodeNotifikasi* head = nullptr;
-nodeNotifikasi* tail = nullptr;
+namespace lorem
+{
 
-void initqueue(){
-    head = nullptr;
-    tail = nullptr;
-}
+    static nodeNotifikasi *head = nullptr;
+    static nodeNotifikasi *tail = nullptr;
 
-bool checkEmpty(){
-    return head == nullptr;
-}
-
-void notifmasuk(std :: string usern, std :: string isin){
-    nodeNotifikasi* pnew = new nodeNotifikasi;
-    pnew->username = usern;
-    pnew->isiNotif = isin;
-    pnew->next = nullptr;
-
-    if(checkEmpty()){
-        head = tail = pnew;
-    }else{
-        tail->next = pnew;
-        tail = pnew;
+    void initqueue()
+    {
+        head = nullptr;
+        tail = nullptr;
     }
-}
 
-void hapusNotif(){
-
-    if(!checkEmpty()){
-        nodeNotifikasi* phapus = head;
-        head = phapus ->next;
-
-        if(head == nullptr) tail = nullptr;
-        delete phapus;
+    bool checkEmpty()
+    {
+        return head == nullptr;
     }
-}
 
-displayNotif lihatNotif(){
-    displayNotif data;
-    if(checkEmpty()){
-        data.isEmpty = true;
-    }else{
-        data.username = head -> username;
-        data.isiNotif = head->isiNotif;
-        data.isEmpty = false;
+    void notifmasuk(std ::string usern, std ::string isin)
+    {
+        nodeNotifikasi *pnew = new nodeNotifikasi;
+        pnew->username = usern;
+        pnew->isiNotif = isin;
+        pnew->next = nullptr;
+
+        if (checkEmpty())
+        {
+            head = tail = pnew;
+        }
+        else
+        {
+            tail->next = pnew;
+            tail = pnew;
+        }
     }
-    return data;
+
+    void hapusNotif()
+    {
+
+        if (!checkEmpty())
+        {
+            nodeNotifikasi *phapus = head;
+            head = phapus->next;
+
+            if (head == nullptr)
+                tail = nullptr;
+            delete phapus;
+        }
+    }
+
+    displayNotif lihatNotif()
+    {
+        displayNotif data;
+        if (checkEmpty())
+        {
+            data.isEmpty = true;
+        }
+        else
+        {
+            data.username = head->username;
+            data.isiNotif = head->isiNotif;
+            data.isEmpty = false;
+        }
+        return data;
+    }
+
+    displayNotif bacanotif()
+    {
+        displayNotif dibaca = lihatNotif();
+        hapusNotif();
+        return dibaca;
+    }
+
 }
-
-displayNotif bacanotif(){
-    displayNotif dibaca = lihatNotif();
-    hapusNotif();
-    return dibaca;
-}
-
-

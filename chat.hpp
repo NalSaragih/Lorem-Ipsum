@@ -1,6 +1,8 @@
 #pragma once
 #include <string>
 
+namespace lorem {
+
 struct nodechat{
     std :: string namapengirim;
     std :: string isipesan;
@@ -18,3 +20,5 @@ void kirimpesan(std :: string pengirim, std :: string isi);
 void hapusriwayat();
 void mulaibaca();
 displaychat bacaselanjutnya();
+
+}

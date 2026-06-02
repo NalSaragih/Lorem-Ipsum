@@ -4,6 +4,7 @@
 #include <QMainWindow>
 #include <QString>
 #include <QVector>
+#include <functional>
 
 #include "SocialMedia.h"
 
@@ -80,8 +81,12 @@ private:
     void refreshTopBar();
     void renderPostsInto(QVBoxLayout* layout, const QVector<Post*>& posts);
     void clearLayout(QVBoxLayout* layout);
-    QWidget* makeUserCard(const QString& username, const QString& subtitle, bool showFollow);
+    QWidget* makeUserCard(const QString& username, const QString& subtitle,
+                          bool showFollow, bool showRemove = false,
+                          std::function<void()> onActionDone = nullptr);
     QWidget* makeChatBubble(const Message& msg);
+    void showFollowListDialog(const QString& title, const QVector<QString>& users,
+                              bool isFollowingList);
 
     SocialMedia sm_;
     QString currentUser_;
@@ -130,10 +135,12 @@ private:
     QLineEdit* newChatInput_;
     QPushButton* newChatBtn_;
 
-    QLabel* profileAvatarLabel_;
-    QLabel* profileNameLabel_;
-    QLabel* profileBioLabel_;
-    QLabel* profileStatsLabel_;
+    QLabel*      profileAvatarLabel_;
+    QLabel*      profileNameLabel_;
+    QLabel*      profileBioLabel_;
+    QLabel*      profilePostsLabel_;
+    QPushButton* profileFollowingBtn_;
+    QPushButton* profileFollowersBtn_;
     QPushButton* profileEditBtn_;
     QPushButton* profileFollowBtn_;
     QPushButton* profileMessageBtn_;

@@ -110,8 +110,10 @@ bool SocialMedia::registerUser(const QString &username, const QString &password)
     QString u = username.trimmed().toLower();
     if (u.isEmpty() || password.isEmpty())
         return false;
-    for (auto it = users_.constBegin(); it != users_.constEnd(); ++it) {
-        if (it.key().toLower() == u) return false;
+    for (auto it = users_.constBegin(); it != users_.constEnd(); ++it)
+    {
+        if (it.key().toLower() == u)
+            return false;
     }
     User user;
     user.username = u;
@@ -230,14 +232,14 @@ QVector<Post *> SocialMedia::getDiscoverPosts(const QString &user, int limit) co
 {
     QSet<QString> allowed;
     allowed.insert(user);
-    for (const auto& s : lorem::getAllFollowing(toStd(user)))
+    for (const auto &s : lorem::getAllFollowing(toStd(user)))
         allowed.insert(toQt(s));
 
     QVector<Post *> out;
-    posts_->forEachReversed([&](Post *p) {
+    posts_->forEachReversed([&](Post *p)
+                            {
         if (!allowed.contains(p->author) && out.size() < limit)
-            out.push_back(p);
-    });
+            out.push_back(p); });
     return out;
 }
 
@@ -486,7 +488,7 @@ bool SocialMedia::isFollowing(const QString &user, const QString &target) const
 QVector<QString> SocialMedia::getFollowing(const QString &user) const
 {
     QVector<QString> out;
-    for (const auto& s : lorem::getAllFollowing(toStd(user)))
+    for (const auto &s : lorem::getAllFollowing(toStd(user)))
         out.push_back(toQt(s));
     std::sort(out.begin(), out.end());
     return out;
@@ -737,41 +739,250 @@ void SocialMedia::seedDemoData()
         return;
     registerUser("haikal", "12345");
     registerUser("dzaky", "12345");
-    registerUser("rayyan", "12345");
-    registerUser("mahfuzh", "12345");
     registerUser("nala", "12345");
 
+    registerUser("fassaha", "12345");
+    registerUser("hasya", "12345");
+    registerUser("rafael", "12345");
+    registerUser("justin", "12345");
+    registerUser("athar", "12345");
+    registerUser("aisha", "12345");
+    registerUser("kaila", "12345");
+    registerUser("shafira", "12345");
+    registerUser("rasya", "12345");
+    registerUser("renata", "12345");
+    registerUser("fayha", "12345");
+    registerUser("syifa", "12345");
+    registerUser("nafarrel", "12345");
+    registerUser("yunus", "12345");
+    registerUser("aliyyah", "12345");
+    registerUser("silka", "12345");
+    registerUser("jasmine", "12345");
+    registerUser("hafidz", "12345");
+    registerUser("sherin", "12345");
+    registerUser("mufid", "12345");
+    registerUser("fikri", "12345");
+    registerUser("salsa", "12345");
+    registerUser("kayla", "12345");
+    registerUser("adrian", "12345");
+    registerUser("mikko", "12345");
+    registerUser("farrel", "12345");
+    registerUser("steven", "12345");
 
-    updateProfile("haikal", "Mahasiswa Informatika - suka struktur data 🌳", "🧠");
-    updateProfile("dzaky", "Backend engineer", "🚀");
-    updateProfile("rayyan", "UI/UX enthusiast", "🎨");
-    updateProfile("mahfuzh", "Cybersecurity enthusiast", "💻");
+    updateProfile("haikal", "Mahasiswa Informatika - suka struktur data", "🧠");
+    updateProfile("dzaky", "Backend engineer dan pecinta clean code", "🚀");
     updateProfile("nala", "Data science enthusiast", "📊");
-    updateProfile("saragih", "master of physics", "⚒️");
 
+    updateProfile("fassaha", "Mahasiswa informatika dan pecinta matematika", "📚");
+    updateProfile("hasya", "Suka desain dan ilustrasi digital", "🎨");
+    updateProfile("rafael", "Penggemar teknologi dan startup", "💡");
+    updateProfile("justin", "Belajar web development", "💻");
+    updateProfile("athar", "Competitive programming enthusiast", "🏆");
+    updateProfile("aisha", "Suka membaca dan menulis", "✍️");
+    updateProfile("kaila", "UI/UX learner", "🖌️");
+    updateProfile("shafira", "Data enthusiast", "📈");
+    updateProfile("rasya", "Pecinta game dan teknologi", "🎮");
+    updateProfile("renata", "Frontend developer", "🌸");
+    updateProfile("fayha", "Machine learning beginner", "🤖");
+    updateProfile("syifa", "Aktif di organisasi kampus", "🌟");
+    updateProfile("nafarrel", "Cloud computing enthusiast", "☁️");
+    updateProfile("yunus", "Problem solver", "🧩");
+    updateProfile("aliyyah", "Suka fotografi", "📷");
+    updateProfile("silka", "Belajar mobile development", "📱");
+    updateProfile("jasmine", "Content creator", "🎥");
+    updateProfile("hafidz", "Cybersecurity enthusiast", "🔐");
+    updateProfile("sherin", "Pecinta buku dan kopi", "☕");
+    updateProfile("mufid", "Backend developer", "⚙️");
+    updateProfile("fikri", "Open source contributor", "❤️");
+    updateProfile("salsa", "Frontend enthusiast", "💜");
+    updateProfile("kayla", "Visual designer", "✨");
+    updateProfile("adrian", "Software engineering learner", "🛠️");
+    updateProfile("mikko", "Database enthusiast", "🗄️");
+    updateProfile("farrel", "AI enthusiast", "🧠");
+    updateProfile("steven", "Linux enthusiast", "🐧");
 
-    followUser("haikal", "dzaky");
-    followUser("haikal", "rayyan");
-    followUser("dzaky", "rayyan");
-    followUser("rayyan", "haikal");
-    followUser("nala", "dzaky");
-    followUser("saragih", "haikal");
-    followUser("dzaky", "haikal");
-    followUser("haikal", "saragih");
-    followUser("saragih", "dzaky");
-    followUser("dzaky", "saragih");
+    followUser("fassaha", "dzaky");
+    followUser("fassaha", "nala");
+    followUser("fassaha", "athar");
 
-    addPost("haikal", "Hari ini ngoding doubly linked list. Mind-blown 🤯 #strukturdata #cpp");
-    addPost("dzaky", "Priority queue itu seru banget buat antrian pasien 🏥 #priorityqueue #strukturdata");
-    addPost("rayyan", "UI Qt makin mantap setelah belajar QStackedWidget. #qt #ui");
-    addPost("haikal", "Lagi cobain bikin sosmed pakai Qt! 🤩 #qt #project");
+    followUser("hasya", "renata");
+    followUser("hasya", "salsa");
+    followUser("hasya", "kayla");
 
-    toggleLike("dzaky", 10);
-    toggleLike("haikal", 50);
-    toggleLike("rayyan", 8);
-    toggleLike("dzaky", 67);
+    followUser("rafael", "haikal");
+    followUser("rafael", "dzaky");
+    followUser("rafael", "farrel");
 
-    sendMessage("haikal", "dzaky", "Bro, udah ngerjain tugas struktur data?");
-    sendMessage("dzaky", "haikal", "Belum, lagi baca slide-nya nih");
-    sendMessage("haikal", "dzaky", "Nanti malam ngerjain bareng yuk");
+    followUser("justin", "haikal");
+    followUser("justin", "rafael");
+    followUser("justin", "adrian");
+
+    followUser("athar", "yunus");
+    followUser("athar", "fikri");
+    followUser("athar", "dzaky");
+
+    followUser("aisha", "hasya");
+    followUser("aisha", "jasmine");
+    followUser("aisha", "sherin");
+
+    followUser("kaila", "renata");
+    followUser("kaila", "salsa");
+    followUser("kaila", "kayla");
+
+    followUser("shafira", "fayha");
+    followUser("shafira", "farrel");
+    followUser("shafira", "haikal");
+
+    followUser("rasya", "athar");
+    followUser("rasya", "rafael");
+    followUser("rasya", "haikal");
+
+    followUser("renata", "hasya");
+    followUser("renata", "kaila");
+    followUser("renata", "salsa");
+
+    followUser("fayha", "farrel");
+    followUser("fayha", "shafira");
+    followUser("fayha", "nala");
+
+    followUser("syifa", "aisha");
+    followUser("syifa", "renata");
+    followUser("syifa", "jasmine");
+
+    followUser("nafarrel", "haikal");
+    followUser("nafarrel", "mufid");
+    followUser("nafarrel", "dzaky");
+
+    followUser("yunus", "fikri");
+    followUser("yunus", "athar");
+    followUser("yunus", "haikal");
+
+    followUser("aliyyah", "hasya");
+    followUser("aliyyah", "renata");
+    followUser("aliyyah", "kayla");
+
+    followUser("silka", "adrian");
+    followUser("silka", "justin");
+    followUser("silka", "renata");
+
+    followUser("jasmine", "hasya");
+    followUser("jasmine", "aisha");
+    followUser("jasmine", "kayla");
+
+    followUser("hafidz", "haikal");
+    followUser("hafidz", "fikri");
+    followUser("hafidz", "steven");
+
+    followUser("sherin", "hasya");
+    followUser("sherin", "aliyyah");
+    followUser("sherin", "jasmine");
+
+    followUser("mufid", "haikal");
+    followUser("mufid", "nafarrel");
+    followUser("mufid", "mikko");
+
+    followUser("fikri", "hafidz");
+    followUser("fikri", "athar");
+    followUser("fikri", "yunus");
+
+    followUser("salsa", "hasya");
+    followUser("salsa", "kayla");
+    followUser("salsa", "kaila");
+
+    followUser("kayla", "hasya");
+    followUser("kayla", "renata");
+    followUser("kayla", "salsa");
+
+    followUser("adrian", "haikal");
+    followUser("adrian", "justin");
+    followUser("adrian", "dzaky");
+
+    followUser("mikko", "mufid");
+    followUser("mikko", "dzaky");
+    followUser("mikko", "haikal");
+
+    followUser("farrel", "nala");
+    followUser("farrel", "fayha");
+    followUser("farrel", "shafira");
+
+    followUser("steven", "fikri");
+    followUser("steven", "haikal");
+    followUser("steven", "dzaky");
+
+    addPost("haikal", "Hari ini belajar AVL Tree 🌳 #strukturdata");
+    addPost("haikal", "Qt ternyata menyenangkan untuk membuat GUI 🤩");
+    addPost("haikal", "Lagi debugging linked list selama 2 jam 😭 #cpp");
+
+    addPost("dzaky", "Sedang merapikan REST API project 🚀");
+    addPost("dzaky", "Clean code membuat hidup lebih tenang ☕");
+    addPost("dzaky", "Caching berhasil mengurangi response time 🔥");
+
+    addPost("nala", "Eksperimen model klasifikasi data 📊");
+    addPost("nala", "Belajar visualisasi data menggunakan Python 📈");
+    addPost("nala", "Dataset baru untuk proyek machine learning ✨");
+
+    addPost("fassaha", "Matematika diskrit ternyata seru 📚");
+    addPost("fassaha", "Graph theory bikin penasaran 🌐");
+    addPost("fassaha", "Belajar kombinatorika malam ini 🔢");
+    addPost("hasya", "Lagi membuat ilustrasi baru 🎨");
+    addPost("rafael", "Ide startup muncul tengah malam 💡");
+    addPost("rafael", "Mencari co-founder untuk project baru 🚀");
+    addPost("rafael", "Pitch deck akhirnya selesai 🎯");
+    addPost("justin", "Belajar React hari ini 💻");
+    addPost("athar", "Berhasil AC soal DP yang sulit 🏆");
+    addPost("athar", "Ngulik shortest path hari ini 🛣️");
+    addPost("athar", "Codeforces malam ini let's go 🔥");
+    addPost("aisha", "Menyelesaikan satu buku minggu ini ✍️");
+    addPost("kaila", "Redesign halaman login aplikasi 🖌️");
+    addPost("shafira", "Data cleaning lebih lama dari modeling 😅");
+    addPost("rasya", "Main game sambil belajar logika 🎮");
+    addPost("renata", "Membuat landing page responsif 🌸");
+    addPost("renata", "Eksplorasi desain dashboard baru 🎨");
+    addPost("renata", "Belajar animasi CSS untuk UI ✨");
+    addPost("fayha", "Pertama kali training model ML 🤖");
+    addPost("syifa", "Rapat organisasi berjalan lancar 🌟");
+    addPost("nafarrel", "Deploy aplikasi ke cloud ☁️");
+    addPost("yunus", "Algoritma hari ini cukup menantang 🧩");
+    addPost("aliyyah", "Hasil foto sunset hari ini 📷");
+    addPost("silka", "Belajar Flutter layout 📱");
+    addPost("jasmine", "Upload video baru 🎥");
+    addPost("hafidz", "Belajar hashing dan enkripsi 🔐");
+    addPost("hafidz", "Mencoba CTF sederhana hari ini 💻");
+    addPost("hafidz", "Cybersecurity semakin menarik 🚨");
+    addPost("sherin", "Ngopi sambil baca buku favorit ☕");
+    addPost("mufid", "Optimasi query database ⚙️");
+    addPost("mufid", "Belajar indexing untuk performa lebih baik 🚀");
+    addPost("fikri", "PR open source diterima ❤️");
+    addPost("fikri", "Berhasil memperbaiki bug pertama di project komunitas 🎉");
+    addPost("salsa", "Eksplorasi animasi CSS 💜");
+    addPost("kayla", "Membuat palet warna baru ✨");
+    addPost("adrian", "Belajar design pattern 🛠️");
+    addPost("mikko", "Normalisasi database selesai 🗄️");
+    addPost("farrel", "Mencoba AI image generation 🧠");
+    addPost("farrel", "Prompt engineering ternyata seru 🤖");
+    addPost("steven", "Install distro Linux baru 🐧");
+
+    sendMessage("haikal", "dzaky", "Bro, backend project gimana?");
+    sendMessage("dzaky", "haikal", "Lagi beresin endpoint terakhir.");
+
+    sendMessage("nala", "haikal", "Dataset yang kemarin masih ada?");
+    sendMessage("haikal", "nala", "Masih, nanti aku kirim.");
+
+    sendMessage("hafidz", "dzaky", "Ada referensi belajar API?");
+    sendMessage("dzaky", "hafidz", "Coba mulai dari dokumentasi Express.");
+
+    sendMessage("shafira", "nala", "Kamu pakai library apa buat visualisasi?");
+    sendMessage("nala", "shafira", "Biasanya matplotlib dan seaborn.");
+
+    sendMessage("renata", "salsa", "Boleh review desain landing page?");
+    sendMessage("salsa", "renata", "Boleh, kirim aja.");
+
+    sendMessage("athar", "yunus", "Sudah coba soal graph terbaru?");
+    sendMessage("yunus", "athar", "Sudah, lumayan tricky.");
+
+    sendMessage("mufid", "haikal", "Besok jadi presentasi?");
+    sendMessage("haikal", "mufid", "Jadi, jam 9 pagi.");
+
+    sendMessage("steven", "hafidz", "Rekomendasi distro Linux?");
+    sendMessage("hafidz", "steven", "Fedora atau Ubuntu dulu aja.");
 }

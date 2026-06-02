@@ -17,6 +17,8 @@
 #include <QStackedWidget>
 #include <QTextEdit>
 #include <QTimer>
+#include <functional>
+#include <memory>
 
 static const char* kBlue    = "#1877F2";
 static const char* kBlueDk  = "#1464D2";
@@ -87,7 +89,9 @@ MainWindow::MainWindow(QWidget* parent)
     , profileAvatarLabel_(new QLabel)
     , profileNameLabel_(new QLabel)
     , profileBioLabel_(new QLabel)
-    , profileStatsLabel_(new QLabel)
+    , profilePostsLabel_(new QLabel)
+    , profileFollowingBtn_(new QPushButton)
+    , profileFollowersBtn_(new QPushButton)
     , profileEditBtn_(new QPushButton("Edit Profil"))
     , profileFollowBtn_(new QPushButton("Follow"))
     , profileMessageBtn_(new QPushButton("Pesan"))
@@ -760,11 +764,36 @@ QWidget* MainWindow::buildProfilePage() {
     profileNameLabel_->setStyleSheet("font-size:22px; font-weight:900; letter-spacing:-0.3px;");
     profileBioLabel_->setStyleSheet(QStringLiteral("color:%1; font-size:13px;").arg(kText));
     profileBioLabel_->setWordWrap(true);
-    profileStatsLabel_->setStyleSheet(QStringLiteral(
-        "color:%1; font-size:12px; margin-top:4px;").arg(kMuted));
+
+    static const char* statLinkStyle = R"(
+        QPushButton {
+            background: transparent;
+            border: none;
+            padding: 0;
+            font-size: 12px;
+            font-weight: 600;
+            text-align: left;
+        }
+        QPushButton:hover { text-decoration: underline; }
+    )";
+    profilePostsLabel_->setStyleSheet(
+        QStringLiteral("color:%1; font-size:12px;").arg(kMuted));
+    profileFollowingBtn_->setStyleSheet(statLinkStyle);
+    profileFollowingBtn_->setCursor(Qt::PointingHandCursor);
+    profileFollowersBtn_->setStyleSheet(statLinkStyle);
+    profileFollowersBtn_->setCursor(Qt::PointingHandCursor);
+
+    auto* statsRow = new QHBoxLayout;
+    statsRow->setSpacing(12);
+    statsRow->setContentsMargins(0, 4, 0, 0);
+    statsRow->addWidget(profilePostsLabel_);
+    statsRow->addWidget(profileFollowingBtn_);
+    statsRow->addWidget(profileFollowersBtn_);
+    statsRow->addStretch();
+
     infoBox->addWidget(profileNameLabel_);
     infoBox->addWidget(profileBioLabel_);
-    infoBox->addWidget(profileStatsLabel_);
+    infoBox->addLayout(statsRow);
 
     auto* btnRow = new QHBoxLayout;
     btnRow->setSpacing(8);
@@ -1260,12 +1289,38 @@ void MainWindow::refreshProfile() {
     profileNameLabel_->setText(u.username);
     profileBioLabel_->setText(u.bio.isEmpty() ? "<i>Belum ada bio</i>" : u.bio);
 
-    profileStatsLabel_->setText(QStringLiteral(
-        "📝 %1 post   ·   ➡️ %2 following   ·   ⬅️ %3 followers   ·   bergabung %4")
-        .arg(sm_.getPostsBy(viewingProfile_).size())
-        .arg(sm_.getFollowing(viewingProfile_).size())
-        .arg(sm_.getFollowers(viewingProfile_).size())
-        .arg(u.joinedAt.toString("dd MMM yyyy")));
+    auto following = sm_.getFollowing(viewingProfile_);
+    auto followers = sm_.getFollowers(viewingProfile_);
+    int postCount  = sm_.getPostsBy(viewingProfile_).size();
+
+    profilePostsLabel_->setText(QStringLiteral(
+        "📝 %1 post   ·   bergabung %2")
+        .arg(postCount).arg(u.joinedAt.toString("dd MMM yyyy")));
+
+    profileFollowingBtn_->disconnect();
+    profileFollowersBtn_->disconnect();
+
+    profileFollowingBtn_->setText(QStringLiteral("➡️  %1 following").arg(following.size()));
+    profileFollowingBtn_->setStyleSheet(QStringLiteral(
+        "QPushButton { background:transparent; border:none; padding:0; "
+        "font-size:12px; font-weight:700; color:%1; text-align:left; }"
+        "QPushButton:hover { color:%2; text-decoration:underline; }").arg(kText, kBlue));
+    connect(profileFollowingBtn_, &QPushButton::clicked, this, [this, following]() {
+        showFollowListDialog(
+            QStringLiteral("Following — %1").arg(viewingProfile_),
+            following, true);
+    });
+
+    profileFollowersBtn_->setText(QStringLiteral("⬅️  %1 followers").arg(followers.size()));
+    profileFollowersBtn_->setStyleSheet(QStringLiteral(
+        "QPushButton { background:transparent; border:none; padding:0; "
+        "font-size:12px; font-weight:700; color:%1; text-align:left; }"
+        "QPushButton:hover { color:%2; text-decoration:underline; }").arg(kText, kBlue));
+    connect(profileFollowersBtn_, &QPushButton::clicked, this, [this, followers]() {
+        showFollowListDialog(
+            QStringLiteral("Followers — %1").arg(viewingProfile_),
+            followers, false);
+    });
 
     bool isSelf = viewingProfile_ == currentUser_;
     profileEditBtn_->setVisible(isSelf);
@@ -1299,25 +1354,27 @@ void MainWindow::refreshProfile() {
         return content;
     };
 
-    auto* followingContent = mkRelCard("➡️  Following");
-    auto following = sm_.getFollowing(viewingProfile_);
+    bool isSelfRel = viewingProfile_ == currentUser_;
+
+    auto* followingContent = mkRelCard(
+        QStringLiteral("➡️  Following  (%1)").arg(following.size()));
     if (following.isEmpty()) {
         auto* e = new QLabel("Belum mengikuti siapapun");
         e->setStyleSheet(QStringLiteral("color:%1; font-size:12px; background:transparent;").arg(kMuted));
         followingContent->addWidget(e);
     }
     for (const auto& f : following)
-        followingContent->addWidget(makeUserCard(f, "", false));
+        followingContent->addWidget(makeUserCard(f, sm_.getUser(f).bio, true, false));
 
-    auto* followersContent = mkRelCard("⬅️  Followers");
-    auto followers = sm_.getFollowers(viewingProfile_);
+    auto* followersContent = mkRelCard(
+        QStringLiteral("⬅️  Followers  (%1)").arg(followers.size()));
     if (followers.isEmpty()) {
         auto* e = new QLabel("Belum ada followers");
         e->setStyleSheet(QStringLiteral("color:%1; font-size:12px; background:transparent;").arg(kMuted));
         followersContent->addWidget(e);
     }
     for (const auto& f : followers)
-        followersContent->addWidget(makeUserCard(f, "", false));
+        followersContent->addWidget(makeUserCard(f, sm_.getUser(f).bio, true, isSelfRel));
 
     relLayout->addStretch();
 
@@ -1431,23 +1488,31 @@ void MainWindow::refreshRightPanel() {
     rightScroll_->setWidget(container);
 }
 
-QWidget* MainWindow::makeUserCard(const QString& username, const QString& subtitle, bool showFollow) {
+QWidget* MainWindow::makeUserCard(const QString& username, const QString& subtitle,
+                                   bool showFollow, bool showRemove,
+                                   std::function<void()> onActionDone) {
     auto* card = new QFrame;
     card->setStyleSheet(QStringLiteral(
-        "QFrame { background:%1; border:1px solid %2; border-radius:10px; }").arg(kBg, kBorder));
+        "QFrame { background:%1; border:1px solid %2; border-radius:12px; }"
+        "QFrame:hover { border:1px solid %3; background:%4; }").arg(kBg, kBorder, kBlue, kCard));
     auto* h = new QHBoxLayout(card);
-    h->setContentsMargins(10, 8, 10, 8);
+    h->setContentsMargins(12, 10, 12, 10);
     h->setSpacing(10);
 
     User u = sm_.getUser(username);
-    auto* avatar = new QLabel(u.avatarEmoji.isEmpty() ? "😀" : u.avatarEmoji);
-    avatar->setFixedSize(36, 36);
-    avatar->setAlignment(Qt::AlignCenter);
-    avatar->setStyleSheet(QStringLiteral(
-        "background:%1; border-radius:18px; font-size:18px; border:1.5px solid %2;").arg(kCard, kBorder));
+    auto* avatarBtn = new QPushButton(u.avatarEmoji.isEmpty() ? "😀" : u.avatarEmoji);
+    avatarBtn->setFixedSize(40, 40);
+    avatarBtn->setCursor(Qt::PointingHandCursor);
+    avatarBtn->setStyleSheet(QStringLiteral(
+        "QPushButton { background:%1; border-radius:20px; font-size:20px; "
+        "border:2px solid %2; }"
+        "QPushButton:hover { border:2px solid %3; }").arg(kCard, kBorder, kBlue));
+    connect(avatarBtn, &QPushButton::clicked, this, [this, username]() {
+        viewProfileOf(username);
+    });
 
     auto* textBox = new QVBoxLayout;
-    textBox->setSpacing(1);
+    textBox->setSpacing(2);
     auto* nameBtn = new QPushButton(username);
     nameBtn->setCursor(Qt::PointingHandCursor);
     nameBtn->setStyleSheet(QStringLiteral(
@@ -1455,38 +1520,165 @@ QWidget* MainWindow::makeUserCard(const QString& username, const QString& subtit
         "font-weight:700; font-size:13px; padding:0; color:%1; }"
         "QPushButton:hover { color:%2; }").arg(kText, kBlue));
     connect(nameBtn, &QPushButton::clicked, this, [this, username]() {
-        topSearchBar_->clear();
         viewProfileOf(username);
     });
     textBox->addWidget(nameBtn);
     if (!subtitle.isEmpty()) {
         auto* sub = new QLabel(subtitle);
-        sub->setStyleSheet(QStringLiteral("color:%1; font-size:11px;").arg(kMuted));
+        sub->setStyleSheet(QStringLiteral("color:%1; font-size:11px; background:transparent;").arg(kMuted));
         sub->setWordWrap(true);
         textBox->addWidget(sub);
     }
-    h->addWidget(avatar);
+    h->addWidget(avatarBtn);
     h->addLayout(textBox, 1);
 
     if (showFollow && username != currentUser_) {
         bool following = sm_.isFollowing(currentUser_, username);
-        auto* btn = new QPushButton(following ? "Following" : "Follow");
+        auto* btn = new QPushButton(following ? "Following ✓" : "Follow");
         btn->setCursor(Qt::PointingHandCursor);
-        btn->setMinimumHeight(30);
+        btn->setMinimumHeight(32);
         btn->setStyleSheet(following
-            ? "QPushButton { background:#E4E6EB; color:#050505; border:none; border-radius:8px; "
-              "padding:4px 14px; font-weight:600; font-size:12px; }"
-            : QStringLiteral("QPushButton { background:%1; color:white; border:none; border-radius:8px; "
-              "padding:4px 14px; font-weight:700; font-size:12px; }"
-              "QPushButton:hover { background:%2; }").arg(kBlue, kBlueDk));
-        connect(btn, &QPushButton::clicked, this, [this, username]() {
+            ? R"(QPushButton {
+                    background:#EBF5FF; color:#1877F2;
+                    border:1.5px solid #BEE3F8; border-radius:8px;
+                    padding:4px 14px; font-weight:700; font-size:12px;
+                }
+                QPushButton:hover { background:#FFF5F7; color:#E0245E; border-color:#FEB2C4; }
+                QPushButton:hover::after { content: 'Unfollow'; })"
+            : QStringLiteral(R"(QPushButton {
+                    background:%1; color:white; border:none; border-radius:8px;
+                    padding:4px 14px; font-weight:700; font-size:12px;
+                }
+                QPushButton:hover { background:%2; })").arg(kBlue, kBlueDk));
+        connect(btn, &QPushButton::clicked, this, [this, username, onActionDone]() {
             if (sm_.isFollowing(currentUser_, username)) sm_.unfollowUser(currentUser_, username);
             else sm_.followUser(currentUser_, username);
-            QTimer::singleShot(0, this, [this]() { refreshAll(); });
+            if (onActionDone) {
+                QTimer::singleShot(0, this, [onActionDone]() { onActionDone(); });
+            } else {
+                QTimer::singleShot(0, this, [this]() { refreshAll(); });
+            }
         });
         h->addWidget(btn);
     }
+
+    if (showRemove && username != currentUser_) {
+        auto* removeBtn = new QPushButton("Hapus");
+        removeBtn->setCursor(Qt::PointingHandCursor);
+        removeBtn->setMinimumHeight(32);
+        removeBtn->setToolTip(QStringLiteral("Hapus %1 dari followers kamu").arg(username));
+        removeBtn->setStyleSheet(R"(
+            QPushButton {
+                background: #FFF5F5;
+                color: #E53E3E;
+                border: 1.5px solid #FEB2B2;
+                border-radius: 8px;
+                padding: 4px 12px;
+                font-weight: 700;
+                font-size: 12px;
+            }
+            QPushButton:hover { background: #FED7D7; }
+        )");
+        connect(removeBtn, &QPushButton::clicked, this, [this, username, onActionDone]() {
+            sm_.unfollowUser(username, currentUser_);
+            if (onActionDone) {
+                QTimer::singleShot(0, this, [onActionDone]() { onActionDone(); });
+            } else {
+                QTimer::singleShot(0, this, [this]() { refreshProfile(); refreshRightPanel(); });
+            }
+        });
+        h->addWidget(removeBtn);
+    }
+
     return card;
+}
+
+void MainWindow::showFollowListDialog(const QString& title, const QVector<QString>& users,
+                                       bool isFollowingList) {
+    auto* dlg = new QDialog(this);
+    dlg->setWindowTitle(title);
+    dlg->setMinimumSize(400, 480);
+    dlg->setAttribute(Qt::WA_DeleteOnClose);
+    dlg->setStyleSheet(QStringLiteral(
+        "QDialog { background:%1; }"
+        "QScrollArea, QScrollArea > QWidget > QWidget { background:%1; }").arg(kCard));
+
+    auto* rootLayout = new QVBoxLayout(dlg);
+    rootLayout->setContentsMargins(0, 0, 0, 0);
+    rootLayout->setSpacing(0);
+
+    auto* header = new QFrame;
+    header->setStyleSheet(QStringLiteral(
+        "QFrame { background:%1; border-bottom:1px solid %2; }").arg(kCard, kBorder));
+    auto* hl = new QHBoxLayout(header);
+    hl->setContentsMargins(18, 14, 14, 14);
+    auto* headerTitle = new QLabel(title);
+    headerTitle->setStyleSheet("font-weight:800; font-size:16px; background:transparent;");
+    auto* closeBtn = new QPushButton("✕");
+    closeBtn->setFixedSize(30, 30);
+    closeBtn->setStyleSheet(R"(
+        QPushButton { background:transparent; border:none; color:#718096; font-size:15px; border-radius:15px; }
+        QPushButton:hover { background:#F0F4F8; color:#1A202C; }
+    )");
+    connect(closeBtn, &QPushButton::clicked, dlg, &QDialog::close);
+    hl->addWidget(headerTitle, 1);
+    hl->addWidget(closeBtn);
+    rootLayout->addWidget(header);
+
+    auto* scroll = new QScrollArea;
+    scroll->setWidgetResizable(true);
+    scroll->setFrameShape(QFrame::NoFrame);
+    scroll->setWidget(new QWidget);
+    rootLayout->addWidget(scroll, 1);
+
+    auto rebuildPtr = std::make_shared<std::function<void()>>();
+
+    *rebuildPtr = [this, rebuildPtr, scroll, headerTitle, isFollowingList, dlg]() {
+        if (!dlg) return;
+
+        QVector<QString> freshList = isFollowingList
+            ? sm_.getFollowing(viewingProfile_)
+            : sm_.getFollowers(viewingProfile_);
+
+        QString baseTitle = isFollowingList
+            ? QStringLiteral("Following — %1").arg(viewingProfile_)
+            : QStringLiteral("Followers — %1").arg(viewingProfile_);
+        headerTitle->setText(QStringLiteral("%1  (%2)").arg(baseTitle).arg(freshList.size()));
+
+        auto* container = new QWidget;
+        container->setStyleSheet(QStringLiteral("background:%1;").arg(kCard));
+        auto* cl = new QVBoxLayout(container);
+        cl->setContentsMargins(12, 8, 12, 12);
+        cl->setSpacing(6);
+
+        if (freshList.isEmpty()) {
+            auto* empty = new QLabel(isFollowingList
+                ? "Belum mengikuti siapapun."
+                : "Belum ada followers.");
+            empty->setAlignment(Qt::AlignCenter);
+            empty->setStyleSheet(QStringLiteral(
+                "color:%1; padding:40px; font-size:13px; background:transparent;").arg(kMuted));
+            cl->addWidget(empty);
+        }
+
+        for (const auto& u : freshList) {
+            bool canRemove = !isFollowingList && (viewingProfile_ == currentUser_);
+            auto onDone = [rebuildPtr, this]() {
+                (*rebuildPtr)();
+                QTimer::singleShot(0, this, [this]() { refreshProfile(); });
+            };
+            cl->addWidget(makeUserCard(u, sm_.getUser(u).bio, true, canRemove, onDone));
+        }
+        cl->addStretch();
+
+        auto* old = scroll->takeWidget();
+        if (old) old->deleteLater();
+        scroll->setWidget(container);
+    };
+
+    (*rebuildPtr)();
+
+    dlg->exec();
 }
 
 void MainWindow::handleCreatePost() {

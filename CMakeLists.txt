@@ -15,7 +15,6 @@ set(SOURCE_FILES
     MainWindow.h
     SocialMedia.cpp
     SocialMedia.h
-    DataStructures.h
     feed.cpp
     feed.hpp
     Notifikasi.cpp

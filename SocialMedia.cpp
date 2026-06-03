@@ -8,15 +8,165 @@
 #include "chat.hpp"
 
 #include <QRegularExpression>
-#include <QRegularExpressionMatchIterator>
 #include <algorithm>
-#include <queue>
 
-static std::string toStd(const QString &s) { return s.toStdString(); }
-static QString toQt(const std::string &s) { return QString::fromStdString(s); }
+static std::string toStd(const QString& s) { return s.toStdString(); }
+static QString     toQt(const std::string& s) { return QString::fromStdString(s); }
+
+// ─────────────────────────────────────────────────────────
+//  PostNode — doubly linked list (gaya feed.cpp)
+// ─────────────────────────────────────────────────────────
+
+void SocialMedia::pushBackPost(PostNode*& head, PostNode*& tail, int& size, Post* p) {
+    PostNode* pnew  = new PostNode;
+    pnew->data = p;
+    pnew->prev = tail;
+    pnew->next = nullptr;
+    if (!head) {
+        head = tail = pnew;
+    } else {
+        tail->next = pnew;
+        tail       = pnew;
+    }
+    ++size;
+}
+
+void SocialMedia::removePostNode(PostNode*& head, PostNode*& tail, int& size, PostNode* node) {
+    if (!node) return;
+    if (node->prev) node->prev->next = node->next;
+    else            head = node->next;
+    if (node->next) node->next->prev = node->prev;
+    else            tail = node->prev;
+    delete node;
+    --size;
+}
+
+// ─────────────────────────────────────────────────────────
+//  CommentNode — doubly linked list (gaya feed.cpp)
+// ─────────────────────────────────────────────────────────
+
+void SocialMedia::pushBackComment(CommentNode*& head, CommentNode*& tail, const Comment& c) {
+    CommentNode* pnew = new CommentNode;
+    pnew->data = c;
+    pnew->prev = tail;
+    pnew->next = nullptr;
+    if (!head) {
+        head = tail = pnew;
+    } else {
+        tail->next = pnew;
+        tail       = pnew;
+    }
+}
+
+void SocialMedia::removeCommentNode(CommentNode*& head, CommentNode*& tail, CommentNode* node) {
+    if (!node) return;
+    if (node->prev) node->prev->next = node->next;
+    else            head = node->next;
+    if (node->next) node->next->prev = node->prev;
+    else            tail = node->prev;
+    delete node;
+}
+
+void SocialMedia::clearCommentList(CommentNode*& head, CommentNode*& tail) {
+    CommentNode* cur = head;
+    while (cur) {
+        CommentNode* del = cur;
+        cur = cur->next;
+        delete del;
+    }
+    head = tail = nullptr;
+}
+
+// ─────────────────────────────────────────────────────────
+//  MsgQueue — queue (gaya chat.cpp)
+// ─────────────────────────────────────────────────────────
+
+void SocialMedia::enqueueMsg(MsgQueue& q, const Message& m) {
+    MsgNode* pnew = new MsgNode;
+    pnew->data = m;
+    pnew->next = nullptr;
+    if (!q.head) {
+        q.head = q.tail = pnew;
+    } else {
+        q.tail->next = pnew;
+        q.tail       = pnew;
+    }
+}
+
+void SocialMedia::clearMsgQueue(MsgQueue& q) {
+    MsgNode* cur = q.head;
+    while (cur) {
+        MsgNode* del = cur;
+        cur = cur->next;
+        delete del;
+    }
+    q.head = q.tail = nullptr;
+}
+
+// ─────────────────────────────────────────────────────────
+//  NotifQueue — queue (gaya Notifikasi.cpp)
+// ─────────────────────────────────────────────────────────
+
+void SocialMedia::enqueueNotif(NotifQueue& q, const Notification& n) {
+    NotifNode* pnew = new NotifNode;
+    pnew->data = n;
+    pnew->next = nullptr;
+    if (!q.head) {
+        q.head = q.tail = pnew;
+    } else {
+        q.tail->next = pnew;
+        q.tail       = pnew;
+    }
+}
+
+bool SocialMedia::dequeueNotif(NotifQueue& q, Notification& out) {
+    if (!q.head) return false;
+    NotifNode* del = q.head;
+    out    = del->data;
+    q.head = del->next;
+    if (!q.head) q.tail = nullptr;
+    delete del;
+    return true;
+}
+
+void SocialMedia::clearNotifQueue(NotifQueue& q) {
+    NotifNode* cur = q.head;
+    while (cur) {
+        NotifNode* del = cur;
+        cur = cur->next;
+        delete del;
+    }
+    q.head = q.tail = nullptr;
+}
+
+// ─────────────────────────────────────────────────────────
+//  ActionNode — stack (gaya like.cpp)
+// ─────────────────────────────────────────────────────────
+
+void SocialMedia::pushAction(ActionNode*& top, const UserAction& a) {
+    ActionNode* pnew = new ActionNode;
+    pnew->data = a;
+    pnew->next = top;
+    top        = pnew;
+}
+
+void SocialMedia::clearActionStack(ActionNode*& top) {
+    ActionNode* cur = top;
+    while (cur) {
+        ActionNode* del = cur;
+        cur = cur->next;
+        delete del;
+    }
+    top = nullptr;
+}
+
+// ─────────────────────────────────────────────────────────
+//  Constructor / Destructor
+// ─────────────────────────────────────────────────────────
 
 SocialMedia::SocialMedia()
-    : posts_(new DoublyList<Post *>()), nextPostId_(1), nextCommentId_(1)
+    : postsHead_(nullptr), postsTail_(nullptr), postsSize_(0)
+    , nextPostId_(1), nextCommentId_(1)
 {
     lorem::initgraph();
     lorem::inittrending();
@@ -26,76 +176,28 @@ SocialMedia::SocialMedia()
     lorem::initchat();
 }
 
-SocialMedia::~SocialMedia()
-{
+SocialMedia::~SocialMedia() {
     destroyEverything();
 }
 
-void SocialMedia::pushUserAction(const QString &user, UserAction::Type type, int postId, const QString &target)
-{
-    auto it = actionHistory_.find(user);
-    Stack<UserAction> *s;
-    if (it == actionHistory_.end())
-    {
-        s = new Stack<UserAction>();
-        actionHistory_.insert(user, s);
+void SocialMedia::destroyEverything() {
+    PostNode* cur = postsHead_;
+    while (cur) {
+        Post* p = cur->data;
+        if (p) {
+            clearCommentList(p->commentsHead, p->commentsTail);
+            delete p;
+        }
+        PostNode* del = cur;
+        cur = cur->next;
+        delete del;
     }
-    else
-    {
-        s = it.value();
-    }
-    UserAction a;
-    a.type = type;
-    a.postId = postId;
-    a.targetUser = target;
-    a.timestamp = QDateTime::currentDateTime();
-    s->push(a);
-}
+    postsHead_ = postsTail_ = nullptr;
+    postsSize_ = 0;
 
-int SocialMedia::actionHistorySize(const QString &user) const
-{
-    auto it = actionHistory_.constFind(user);
-    return (it == actionHistory_.constEnd()) ? 0 : it.value()->size();
-}
-
-QVector<UserAction> SocialMedia::getActionHistory(const QString &user, int limit) const
-{
-    QVector<UserAction> out;
-    auto it = actionHistory_.constFind(user);
-    if (it == actionHistory_.constEnd())
-        return out;
-    it.value()->forEach([&](const UserAction &a)
-                        {
-        if (limit < 0 || out.size() < limit) out.push_back(a); });
-    return out;
-}
-
-void SocialMedia::clearActionHistory(const QString &user)
-{
-    auto it = actionHistory_.find(user);
-    if (it != actionHistory_.end())
-        it.value()->clear();
-}
-
-void SocialMedia::destroyEverything()
-{
-    if (posts_)
-    {
-        posts_->forEach([](Post *p)
-                        {
-            if (p) {
-                delete p->comments;
-                delete p;
-            } });
-        delete posts_;
-        posts_ = nullptr;
-    }
-    for (auto *q : chats_)
-        delete q;
-    for (auto *q : notifs_)
-        delete q;
-    for (auto *s : actionHistory_)
-        delete s;
+    for (auto& q : chats_)  clearMsgQueue(q);
+    for (auto& q : notifs_) clearNotifQueue(q);
+    for (auto& top : actionHistory_) clearActionStack(top);
     chats_.clear();
     notifs_.clear();
     actionHistory_.clear();
@@ -105,253 +207,258 @@ void SocialMedia::destroyEverything()
     lorem::resetlike();
 }
 
-bool SocialMedia::registerUser(const QString &username, const QString &password)
-{
-    QString u = username.trimmed().toLower();
-    if (u.isEmpty() || password.isEmpty())
-        return false;
-    for (auto it = users_.constBegin(); it != users_.constEnd(); ++it)
-    {
-        if (it.key().toLower() == u)
-            return false;
-    }
-    User user;
-    user.username = u;
-    user.password = password;
-    user.bio = QStringLiteral("Halo, saya %1 ✨").arg(u);
-    user.avatarEmoji = "😀";
-    user.joinedAt = QDateTime::currentDateTime();
-    users_.insert(u, user);
+// ─────────────────────────────────────────────────────────
+//  pushUserAction
+// ─────────────────────────────────────────────────────────
 
+void SocialMedia::pushUserAction(const QString& user, UserAction::Type type,
+                                  int postId, const QString& target) {
+    if (!actionHistory_.contains(user))
+        actionHistory_.insert(user, nullptr);
+
+    UserAction a;
+    a.type       = type;
+    a.postId     = postId;
+    a.targetUser = target;
+    a.timestamp  = QDateTime::currentDateTime();
+    pushAction(actionHistory_[user], a);
+}
+
+int SocialMedia::actionHistorySize(const QString& user) const {
+    auto it = actionHistory_.constFind(user);
+    if (it == actionHistory_.constEnd()) return 0;
+    int n = 0;
+    ActionNode* cur = it.value();
+    while (cur) { ++n; cur = cur->next; }
+    return n;
+}
+
+QVector<UserAction> SocialMedia::getActionHistory(const QString& user, int limit) const {
+    QVector<UserAction> out;
+    auto it = actionHistory_.constFind(user);
+    if (it == actionHistory_.constEnd()) return out;
+    ActionNode* cur = it.value();
+    while (cur) {
+        if (limit >= 0 && out.size() >= limit) break;
+        out.push_back(cur->data);
+        cur = cur->next;
+    }
+    return out;
+}
+
+void SocialMedia::clearActionHistory(const QString& user) {
+    auto it = actionHistory_.find(user);
+    if (it != actionHistory_.end())
+        clearActionStack(it.value());
+}
+
+// ─────────────────────────────────────────────────────────
+//  User
+// ─────────────────────────────────────────────────────────
+
+bool SocialMedia::registerUser(const QString& username, const QString& password) {
+    QString u = username.trimmed().toLower();
+    if (u.isEmpty() || password.isEmpty()) return false;
+    for (auto it = users_.constBegin(); it != users_.constEnd(); ++it)
+        if (it.key().toLower() == u) return false;
+    User user;
+    user.username   = u;
+    user.password   = password;
+    user.bio        = QStringLiteral("Halo, saya %1 ✨").arg(u);
+    user.avatarEmoji = "😀";
+    user.joinedAt   = QDateTime::currentDateTime();
+    users_.insert(u, user);
     lorem::tambahuser(toStd(u));
     return true;
 }
 
-bool SocialMedia::validateLogin(const QString &username, const QString &password) const
-{
+bool SocialMedia::validateLogin(const QString& username, const QString& password) const {
     auto it = users_.constFind(username.trimmed().toLower());
     return it != users_.constEnd() && it.value().password == password;
 }
 
-bool SocialMedia::userExists(const QString &username) const
-{
+bool SocialMedia::userExists(const QString& username) const {
     return users_.contains(username.trimmed().toLower());
 }
 
-User SocialMedia::getUser(const QString &username) const
-{
+User SocialMedia::getUser(const QString& username) const {
     return users_.value(username.trimmed().toLower());
 }
 
-void SocialMedia::updateProfile(const QString &username, const QString &bio, const QString &avatar)
-{
+void SocialMedia::updateProfile(const QString& username, const QString& bio, const QString& avatar) {
     auto it = users_.find(username);
-    if (it == users_.end())
-        return;
-    if (!bio.isNull())
-        it.value().bio = bio;
-    if (!avatar.isEmpty())
-        it.value().avatarEmoji = avatar;
+    if (it == users_.end()) return;
+    if (!bio.isNull())     it.value().bio = bio;
+    if (!avatar.isEmpty()) it.value().avatarEmoji = avatar;
 }
 
-QVector<QString> SocialMedia::allUsers() const
-{
+QVector<QString> SocialMedia::allUsers() const {
     QVector<QString> result;
     result.reserve(users_.size());
     for (auto it = users_.constBegin(); it != users_.constEnd(); ++it)
-    {
         result.push_back(it.key());
-    }
     std::sort(result.begin(), result.end());
     return result;
 }
 
-QVector<QString> SocialMedia::searchUsers(const QString &query) const
-{
+QVector<QString> SocialMedia::searchUsers(const QString& query) const {
     QVector<QString> result;
     QString q = query.trimmed().toLower();
     for (auto it = users_.constBegin(); it != users_.constEnd(); ++it)
-    {
         if (q.isEmpty() || it.key().toLower().contains(q))
-        {
             result.push_back(it.key());
-        }
-    }
     std::sort(result.begin(), result.end());
     return result;
 }
 
-int SocialMedia::addPost(const QString &author, const QString &content)
-{
-    if (!userExists(author) || content.trimmed().isEmpty())
-        return -1;
-    Post *p = new Post();
-    p->id = nextPostId_++;
-    p->author = author;
-    p->content = content.trimmed();
+// ─────────────────────────────────────────────────────────
+//  Post
+// ─────────────────────────────────────────────────────────
+
+int SocialMedia::addPost(const QString& author, const QString& content) {
+    if (!userExists(author) || content.trimmed().isEmpty()) return -1;
+    Post* p = new Post;
+    p->id        = nextPostId_++;
+    p->author    = author;
+    p->content   = content.trimmed();
     p->timestamp = QDateTime::currentDateTime();
-    p->comments = new DoublyList<Comment>();
-    posts_->pushBack(p);
+
+    pushBackPost(postsHead_, postsTail_, postsSize_, p);
 
     lorem::tambahpostingan(toStd(author), toStd(p->content));
     pushUserAction(author, UserAction::ActPost, p->id);
 
-    const QStringList tags = extractHashtags(content);
-    for (const auto &t : tags)
-    {
+    for (const auto& t : extractHashtags(content))
         lorem::updatetrending(toStd(t), 2);
-    }
+
     return p->id;
 }
 
-QVector<Post *> SocialMedia::getAllPostsNewestFirst() const
-{
-    QVector<Post *> out;
-    out.reserve(posts_->size());
-    posts_->forEachReversed([&](Post *p)
-                            { out.push_back(p); });
+QVector<Post*> SocialMedia::getAllPostsNewestFirst() const {
+    QVector<Post*> out;
+    PostNode* cur = postsTail_;
+    while (cur) {
+        out.push_back(cur->data);
+        cur = cur->prev;
+    }
     return out;
 }
 
-QVector<Post *> SocialMedia::getFeedFor(const QString &user) const
-{
-    QVector<Post *> out;
+QVector<Post*> SocialMedia::getFeedFor(const QString& user) const {
     QSet<QString> allowed;
     allowed.insert(user);
-    auto fol = getFollowing(user);
-    for (const auto &u : fol)
-        allowed.insert(u);
-
-    posts_->forEachReversed([&](Post *p)
-                            {
-        if (allowed.contains(p->author)) out.push_back(p); });
-    return out;
-}
-
-QVector<Post *> SocialMedia::getDiscoverPosts(const QString &user, int limit) const
-{
-    QSet<QString> allowed;
-    allowed.insert(user);
-    for (const auto &s : lorem::getAllFollowing(toStd(user)))
+    for (const auto& s : lorem::getAllFollowing(toStd(user)))
         allowed.insert(toQt(s));
 
-    QVector<Post *> out;
-    posts_->forEachReversed([&](Post *p)
-                            {
-        if (!allowed.contains(p->author) && out.size() < limit)
-            out.push_back(p); });
+    QVector<Post*> out;
+    PostNode* cur = postsTail_;
+    while (cur) {
+        if (allowed.contains(cur->data->author))
+            out.push_back(cur->data);
+        cur = cur->prev;
+    }
     return out;
 }
 
-QVector<Post *> SocialMedia::getPostsBy(const QString &user) const
-{
-    QVector<Post *> out;
-    posts_->forEachReversed([&](Post *p)
-                            {
-        if (p->author == user) out.push_back(p); });
+QVector<Post*> SocialMedia::getDiscoverPosts(const QString& user, int limit) const {
+    QSet<QString> allowed;
+    allowed.insert(user);
+    for (const auto& s : lorem::getAllFollowing(toStd(user)))
+        allowed.insert(toQt(s));
+
+    QVector<Post*> out;
+    PostNode* cur = postsTail_;
+    while (cur && out.size() < limit) {
+        if (!allowed.contains(cur->data->author))
+            out.push_back(cur->data);
+        cur = cur->prev;
+    }
     return out;
 }
 
-Post *SocialMedia::findPost(int postId) const
-{
-    Post *found = nullptr;
-    posts_->forEach([&](Post *p)
-                    {
-        if (!found && p->id == postId) found = p; });
-    return found;
+QVector<Post*> SocialMedia::getPostsBy(const QString& user) const {
+    QVector<Post*> out;
+    PostNode* cur = postsTail_;
+    while (cur) {
+        if (cur->data->author == user)
+            out.push_back(cur->data);
+        cur = cur->prev;
+    }
+    return out;
 }
 
-int SocialMedia::totalPosts() const
-{
-    return posts_->size();
+Post* SocialMedia::findPost(int postId) const {
+    PostNode* cur = postsHead_;
+    while (cur) {
+        if (cur->data->id == postId) return cur->data;
+        cur = cur->next;
+    }
+    return nullptr;
 }
 
-bool SocialMedia::deletePost(int postId, const QString &actor)
-{
-    if (!posts_)
-        return false;
-    DoublyList<Post *>::Node *target = nullptr;
-    for (auto *n = posts_->head(); n != nullptr; n = n->next)
-    {
-        if (n->data && n->data->id == postId)
-        {
-            target = n;
-            break;
-        }
-    }
-    if (!target)
-        return false;
-    Post *p = target->data;
-    if (p->author != actor)
-        return false;
+int SocialMedia::totalPosts() const {
+    return postsSize_;
+}
 
-    const QStringList tags = extractHashtags(p->content);
-    int totalBump = 2 + p->likedBy.size();
-    for (const auto &t : tags)
-    {
-        lorem::updatetrending(toStd(t), -totalBump);
+bool SocialMedia::deletePost(int postId, const QString& actor) {
+    PostNode* target = nullptr;
+    for (PostNode* cur = postsHead_; cur; cur = cur->next) {
+        if (cur->data && cur->data->id == postId) { target = cur; break; }
     }
+    if (!target) return false;
+    Post* p = target->data;
+    if (p->author != actor) return false;
 
-    for (const auto &liker : p->likedBy)
-    {
+    for (const auto& t : extractHashtags(p->content))
+        lorem::updatetrending(toStd(t), -(2 + (int)p->likedBy.size()));
+
+    for (const auto& liker : p->likedBy)
         if (liker != actor)
-        {
             pushNotification(liker,
-                             QStringLiteral("Post yang kamu like dihapus oleh %1").arg(actor),
-                             actor, "system");
-        }
-    }
+                QStringLiteral("Post yang kamu like dihapus oleh %1").arg(actor),
+                actor, "system");
 
     pushUserAction(actor, UserAction::ActDeletePost, postId);
-    delete p->comments;
+    clearCommentList(p->commentsHead, p->commentsTail);
     delete p;
-    posts_->removeNode(target);
+    removePostNode(postsHead_, postsTail_, postsSize_, target);
     return true;
 }
 
-int SocialMedia::toggleLike(const QString &user, int postId)
-{
-    Post *p = findPost(postId);
-    if (!p)
-        return -1;
+// ─────────────────────────────────────────────────────────
+//  Like
+// ─────────────────────────────────────────────────────────
+
+int SocialMedia::toggleLike(const QString& user, int postId) {
+    Post* p = findPost(postId);
+    if (!p) return -1;
     const QStringList tags = extractHashtags(p->content);
 
-    if (p->likedBy.contains(user))
-    {
+    if (p->likedBy.contains(user)) {
         p->likedBy.remove(user);
-        for (const auto &t : tags)
-            lorem::updatetrending(toStd(t), -1);
+        for (const auto& t : tags) lorem::updatetrending(toStd(t), -1);
         pushUserAction(user, UserAction::ActUnlike, postId);
         return 0;
     }
     p->likedBy.insert(user);
-    for (const auto &t : tags)
-        lorem::updatetrending(toStd(t), 1);
+    for (const auto& t : tags) lorem::updatetrending(toStd(t), 1);
     lorem::pushlike(toStd(user), postId);
     pushUserAction(user, UserAction::ActLike, postId);
 
     if (p->author != user)
-    {
         pushNotification(p->author,
-                         QStringLiteral("%1 menyukai postinganmu").arg(user),
-                         user, "like");
-    }
+            QStringLiteral("%1 menyukai postinganmu").arg(user), user, "like");
     return 1;
 }
 
-int SocialMedia::undoLastLike(const QString &user)
-{
-    while (!lorem::isLikeEmpty(toStd(user)))
-    {
+int SocialMedia::undoLastLike(const QString& user) {
+    while (!lorem::isLikeEmpty(toStd(user))) {
         lorem::displaylike top = lorem::poplike(toStd(user));
-        if (top.isEmpty)
-            break;
-        Post *p = findPost(top.postId);
-        if (p && p->likedBy.contains(user))
-        {
+        if (top.isEmpty) break;
+        Post* p = findPost(top.postId);
+        if (p && p->likedBy.contains(user)) {
             p->likedBy.remove(user);
-            const QStringList tags = extractHashtags(p->content);
-            for (const auto &t : tags)
+            for (const auto& t : extractHashtags(p->content))
                 lorem::updatetrending(toStd(t), -1);
             return top.postId;
         }
@@ -359,630 +466,343 @@ int SocialMedia::undoLastLike(const QString &user)
     return -1;
 }
 
-int SocialMedia::likeStackSize(const QString &user) const
-{
+int SocialMedia::likeStackSize(const QString& user) const {
     return lorem::sizeLike(toStd(user));
 }
 
-QVector<LikeStackEntry> SocialMedia::getLikeStack(const QString &user, int limit) const
-{
+QVector<LikeStackEntry> SocialMedia::getLikeStack(const QString& user, int limit) const {
     QVector<LikeStackEntry> out;
     QVector<int> buf;
-    while (!lorem::isLikeEmpty(toStd(user)))
-    {
+
+    while (!lorem::isLikeEmpty(toStd(user))) {
         lorem::displaylike t = lorem::poplike(toStd(user));
-        if (t.isEmpty)
-            break;
+        if (t.isEmpty) break;
         buf.push_back(t.postId);
-        if (limit > 0 && buf.size() >= limit)
-            break;
+        if (limit > 0 && buf.size() >= limit) break;
     }
-    for (int i = 0; i < buf.size(); ++i)
-    {
+    for (int i = 0; i < buf.size(); ++i) {
         LikeStackEntry e;
         e.postId = buf[i];
-        Post *p = findPost(buf[i]);
-        if (p)
-        {
-            e.postAuthor = p->author;
+        Post* p = findPost(buf[i]);
+        if (p) {
+            e.postAuthor  = p->author;
             e.postPreview = p->content.left(48);
-            e.stillLiked = p->likedBy.contains(user);
-        }
-        else
-        {
-            e.postPreview = QStringLiteral("[post sudah dihapus]");
+            e.stillLiked  = p->likedBy.contains(user);
+        } else {
+            e.postPreview = "[post sudah dihapus]";
         }
         out.push_back(e);
     }
     for (int i = buf.size() - 1; i >= 0; --i)
-    {
         lorem::pushlike(toStd(user), buf[i]);
-    }
+
     return out;
 }
 
-int SocialMedia::addComment(const QString &author, int postId, const QString &text)
-{
-    Post *p = findPost(postId);
-    if (!p || text.trimmed().isEmpty() || !userExists(author))
-        return -1;
+// ─────────────────────────────────────────────────────────
+//  Comment
+// ─────────────────────────────────────────────────────────
+
+int SocialMedia::addComment(const QString& author, int postId, const QString& text) {
+    Post* p = findPost(postId);
+    if (!p || text.trimmed().isEmpty() || !userExists(author)) return -1;
+
     Comment c;
-    c.id = nextCommentId_++;
-    c.author = author;
-    c.text = text.trimmed();
+    c.id        = nextCommentId_++;
+    c.author    = author;
+    c.text      = text.trimmed();
     c.timestamp = QDateTime::currentDateTime();
-    p->comments->pushBack(c);
+    pushBackComment(p->commentsHead, p->commentsTail, c);
 
     if (p->author != author)
-    {
         pushNotification(p->author,
-                         QStringLiteral("%1 mengomentari postinganmu").arg(author),
-                         author, "comment");
-    }
+            QStringLiteral("%1 mengomentari postinganmu").arg(author), author, "comment");
     pushUserAction(author, UserAction::ActComment, postId);
     return c.id;
 }
 
-QVector<Comment> SocialMedia::getComments(int postId) const
-{
+QVector<Comment> SocialMedia::getComments(int postId) const {
     QVector<Comment> out;
-    Post *p = findPost(postId);
-    if (!p || !p->comments)
-        return out;
-    p->comments->forEach([&](const Comment &c)
-                         { out.push_back(c); });
+    Post* p = findPost(postId);
+    if (!p) return out;
+    CommentNode* cur = p->commentsHead;
+    while (cur) {
+        out.push_back(cur->data);
+        cur = cur->next;
+    }
     return out;
 }
 
-bool SocialMedia::deleteComment(int postId, int commentId, const QString &actor)
-{
-    Post *p = findPost(postId);
-    if (!p || !p->comments)
-        return false;
-    DoublyList<Comment>::Node *target = nullptr;
-    for (auto *n = p->comments->head(); n != nullptr; n = n->next)
-    {
-        if (n->data.id == commentId)
-        {
-            target = n;
-            break;
-        }
+bool SocialMedia::deleteComment(int postId, int commentId, const QString& actor) {
+    Post* p = findPost(postId);
+    if (!p) return false;
+
+    CommentNode* target = nullptr;
+    for (CommentNode* cur = p->commentsHead; cur; cur = cur->next) {
+        if (cur->data.id == commentId) { target = cur; break; }
     }
-    if (!target)
-        return false;
-    if (target->data.author != actor && p->author != actor)
-        return false;
-    p->comments->removeNode(target);
+    if (!target) return false;
+    if (target->data.author != actor && p->author != actor) return false;
+
+    removeCommentNode(p->commentsHead, p->commentsTail, target);
     pushUserAction(actor, UserAction::ActDeleteComment, postId);
     return true;
 }
 
-bool SocialMedia::followUser(const QString &user, const QString &target)
-{
-    if (user == target || !userExists(user) || !userExists(target))
-        return false;
-    if (lorem::sudahfollow(toStd(user), toStd(target)))
-        return false;
+// ─────────────────────────────────────────────────────────
+//  Follow
+// ─────────────────────────────────────────────────────────
+
+bool SocialMedia::followUser(const QString& user, const QString& target) {
+    if (user == target || !userExists(user) || !userExists(target)) return false;
+    if (lorem::sudahfollow(toStd(user), toStd(target))) return false;
     lorem::follow(toStd(user), toStd(target));
     pushUserAction(user, UserAction::ActFollow, -1, target);
     pushNotification(target,
-                     QStringLiteral("%1 mengikuti kamu").arg(user),
-                     user, "follow");
+        QStringLiteral("%1 mengikuti kamu").arg(user), user, "follow");
     return true;
 }
 
-bool SocialMedia::unfollowUser(const QString &user, const QString &target)
-{
-    if (!lorem::sudahfollow(toStd(user), toStd(target)))
-        return false;
+bool SocialMedia::unfollowUser(const QString& user, const QString& target) {
+    if (!lorem::sudahfollow(toStd(user), toStd(target))) return false;
     lorem::unfollow(toStd(user), toStd(target));
     pushUserAction(user, UserAction::ActUnfollow, -1, target);
     return true;
 }
 
-bool SocialMedia::isFollowing(const QString &user, const QString &target) const
-{
+bool SocialMedia::isFollowing(const QString& user, const QString& target) const {
     return lorem::sudahfollow(toStd(user), toStd(target));
 }
 
-QVector<QString> SocialMedia::getFollowing(const QString &user) const
-{
+QVector<QString> SocialMedia::getFollowing(const QString& user) const {
     QVector<QString> out;
-    for (const auto &s : lorem::getAllFollowing(toStd(user)))
+    for (const auto& s : lorem::getAllFollowing(toStd(user)))
         out.push_back(toQt(s));
     std::sort(out.begin(), out.end());
     return out;
 }
 
-QVector<QString> SocialMedia::getFollowers(const QString &user) const
-{
+QVector<QString> SocialMedia::getFollowers(const QString& user) const {
     QVector<QString> out;
     for (auto it = users_.constBegin(); it != users_.constEnd(); ++it)
-    {
-        if (it.key() == user)
-            continue;
-        if (lorem::sudahfollow(toStd(it.key()), toStd(user)))
-        {
+        if (it.key() != user && lorem::sudahfollow(toStd(it.key()), toStd(user)))
             out.push_back(it.key());
-        }
-    }
     std::sort(out.begin(), out.end());
     return out;
 }
 
-QVector<QString> SocialMedia::getFollowSuggestions(const QString &user, int maxResults) const
-{
+QVector<QString> SocialMedia::getFollowSuggestions(const QString& user, int maxResults) const {
     QSet<QString> myFollowing;
     auto direct = getFollowing(user);
-    for (const auto &u : direct)
-        myFollowing.insert(u);
+    for (const auto& u : direct) myFollowing.insert(u);
 
     QHash<QString, int> mutual;
-    for (const auto &f : direct)
-    {
-        auto fof = getFollowing(f);
-        for (const auto &ff : fof)
-        {
-            if (ff == user || myFollowing.contains(ff))
-                continue;
+    for (const auto& f : direct) {
+        for (const auto& ff : getFollowing(f)) {
+            if (ff == user || myFollowing.contains(ff)) continue;
             mutual[ff] += 1;
         }
     }
-
-    if (mutual.isEmpty())
-    {
+    if (mutual.isEmpty()) {
         for (auto it = users_.constBegin(); it != users_.constEnd(); ++it)
-        {
             if (it.key() != user && !myFollowing.contains(it.key()))
-            {
                 mutual.insert(it.key(), 0);
-            }
-        }
     }
 
-    QVector<QPair<QString, int>> sorted;
+    QVector<QPair<QString,int>> sorted;
     sorted.reserve(mutual.size());
     for (auto it = mutual.constBegin(); it != mutual.constEnd(); ++it)
-    {
-        sorted.push_back({it.key(), it.value()});
-    }
+        sorted.push_back({ it.key(), it.value() });
     std::sort(sorted.begin(), sorted.end(),
-              [](const QPair<QString, int> &a, const QPair<QString, int> &b)
-              {
-                  if (a.second != b.second)
-                      return a.second > b.second;
-                  return a.first < b.first;
-              });
+        [](const QPair<QString,int>& a, const QPair<QString,int>& b) {
+            return a.second != b.second ? a.second > b.second : a.first < b.first;
+        });
 
     QVector<QString> out;
     for (int i = 0; i < sorted.size() && i < maxResults; ++i)
-    {
         out.push_back(sorted[i].first);
-    }
     return out;
 }
 
-QString SocialMedia::chatKey(const QString &a, const QString &b)
-{
+// ─────────────────────────────────────────────────────────
+//  Chat
+// ─────────────────────────────────────────────────────────
+
+QString SocialMedia::chatKey(const QString& a, const QString& b) {
     return (a < b) ? a + "|" + b : b + "|" + a;
 }
 
-void SocialMedia::sendMessage(const QString &from, const QString &to, const QString &text)
-{
-    if (!userExists(from) || !userExists(to) || text.trimmed().isEmpty())
-        return;
+void SocialMedia::sendMessage(const QString& from, const QString& to, const QString& text) {
+    if (!userExists(from) || !userExists(to) || text.trimmed().isEmpty()) return;
     QString key = chatKey(from, to);
-    auto it = chats_.find(key);
-    Queue<Message> *q;
-    if (it == chats_.end())
-    {
-        q = new Queue<Message>();
-        chats_.insert(key, q);
-    }
-    else
-    {
-        q = it.value();
-    }
-    Message m{from, to, text.trimmed(), QDateTime::currentDateTime()};
-    q->enqueue(m);
+    if (!chats_.contains(key)) chats_.insert(key, MsgQueue{});
+
+    Message m;
+    m.sender    = from;
+    m.receiver  = to;
+    m.text      = text.trimmed();
+    m.timestamp = QDateTime::currentDateTime();
+    enqueueMsg(chats_[key], m);
     lorem::kirimpesan(toStd(from), toStd(text));
 
     if (from != to)
-    {
         pushNotification(to,
-                         QStringLiteral("Pesan baru dari %1").arg(from),
-                         from, "message");
-    }
+            QStringLiteral("Pesan baru dari %1").arg(from), from, "message");
 }
 
-QVector<Message> SocialMedia::getConversation(const QString &a, const QString &b) const
-{
+QVector<Message> SocialMedia::getConversation(const QString& a, const QString& b) const {
     QVector<Message> out;
     auto it = chats_.constFind(chatKey(a, b));
-    if (it == chats_.constEnd())
-        return out;
-    it.value()->forEach([&](const Message &m)
-                        { out.push_back(m); });
+    if (it == chats_.constEnd()) return out;
+    for (MsgNode* cur = it.value().head; cur; cur = cur->next)
+        out.push_back(cur->data);
     return out;
 }
 
-QVector<QString> SocialMedia::getChatPartners(const QString &user) const
-{
+QVector<QString> SocialMedia::getChatPartners(const QString& user) const {
     QSet<QString> seen;
-    for (auto it = chats_.constBegin(); it != chats_.constEnd(); ++it)
-    {
-        const QString &key = it.key();
+    for (auto it = chats_.constBegin(); it != chats_.constEnd(); ++it) {
+        const QString& key = it.key();
         int sep = key.indexOf('|');
-        if (sep < 0)
-            continue;
-        QString left = key.left(sep);
+        if (sep < 0) continue;
+        QString left  = key.left(sep);
         QString right = key.mid(sep + 1);
-        if (left == user)
-            seen.insert(right);
-        else if (right == user)
-            seen.insert(left);
+        if (left  == user) seen.insert(right);
+        else if (right == user) seen.insert(left);
     }
     QVector<QString> out;
-    for (const auto &p : seen)
-        out.push_back(p);
+    for (const auto& p : seen) out.push_back(p);
     std::sort(out.begin(), out.end());
     return out;
 }
 
-Queue<Notification> *SocialMedia::notifFor(const QString &user)
-{
-    auto it = notifs_.find(user);
-    if (it == notifs_.end())
-    {
-        auto *q = new Queue<Notification>();
-        notifs_.insert(user, q);
-        return q;
-    }
-    return it.value();
+// ─────────────────────────────────────────────────────────
+//  Notification
+// ─────────────────────────────────────────────────────────
+
+NotifQueue& SocialMedia::notifFor(const QString& user) {
+    if (!notifs_.contains(user)) notifs_.insert(user, NotifQueue{});
+    return notifs_[user];
 }
 
-void SocialMedia::pushNotification(const QString &user, const QString &text,
-                                   const QString &actor, const QString &type)
-{
-    if (!userExists(user))
-        return;
+void SocialMedia::pushNotification(const QString& user, const QString& text,
+                                    const QString& actor, const QString& type) {
+    if (!userExists(user)) return;
     Notification n;
-    n.id = nextNotifId_++;
-    n.text = text;
-    n.actor = actor;
-    n.type = type;
+    n.id        = nextNotifId_++;
+    n.text      = text;
+    n.actor     = actor;
+    n.type      = type;
     n.timestamp = QDateTime::currentDateTime();
-    n.read = false;
-    notifFor(user)->enqueue(n);
+    n.read      = false;
+    enqueueNotif(notifFor(user), n);
     lorem::notifmasuk(toStd(user), toStd(text));
 }
 
-QVector<Notification> SocialMedia::getNotifications(const QString &user, bool newestFirst) const
-{
+QVector<Notification> SocialMedia::getNotifications(const QString& user, bool newestFirst) const {
     QVector<Notification> out;
     auto it = notifs_.constFind(user);
-    if (it == notifs_.constEnd())
-        return out;
-    if (newestFirst)
-    {
-        it.value()->forEachReversed([&](const Notification &n)
-                                    { out.push_back(n); });
-    }
-    else
-    {
-        it.value()->forEach([&](const Notification &n)
-                            { out.push_back(n); });
-    }
+    if (it == notifs_.constEnd()) return out;
+    for (NotifNode* cur = it.value().head; cur; cur = cur->next)
+        out.push_back(cur->data);
+    if (newestFirst) std::reverse(out.begin(), out.end());
     return out;
 }
 
-void SocialMedia::markAllRead(const QString &user)
-{
+void SocialMedia::markAllRead(const QString& user) {
     auto it = notifs_.find(user);
-    if (it == notifs_.end())
-        return;
-    Queue<Notification> *q = it.value();
-    auto *fresh = new Queue<Notification>();
+    if (it == notifs_.end()) return;
+
+    QVector<Notification> buf;
     Notification n;
-    while (q->dequeue(n))
-    {
+    while (dequeueNotif(it.value(), n)) {
         n.read = true;
-        fresh->enqueue(n);
+        buf.push_back(n);
     }
-    delete q;
-    notifs_.insert(user, fresh);
+    for (const auto& item : buf)
+        enqueueNotif(it.value(), item);
 }
 
-int SocialMedia::unreadCount(const QString &user) const
-{
+int SocialMedia::unreadCount(const QString& user) const {
     auto it = notifs_.constFind(user);
-    if (it == notifs_.constEnd())
-        return 0;
+    if (it == notifs_.constEnd()) return 0;
     int c = 0;
-    it.value()->forEach([&](const Notification &n)
-                        { if (!n.read) ++c; });
+    for (NotifNode* cur = it.value().head; cur; cur = cur->next)
+        if (!cur->data.read) ++c;
     return c;
 }
 
-QVector<QPair<QString, int>> SocialMedia::getTrendingTopics(int limit) const
-{
-    QVector<QPair<QString, int>> out;
+// ─────────────────────────────────────────────────────────
+//  Trending
+// ─────────────────────────────────────────────────────────
+
+QVector<QPair<QString,int>> SocialMedia::getTrendingTopics(int limit) const {
+    QVector<QPair<QString,int>> out;
     lorem::mulailihattrending();
-    while (out.size() < limit)
-    {
+    while (out.size() < limit) {
         lorem::displaytree d = lorem::lihatselanjutnyatrending();
-        if (d.isEmpty)
-            break;
-        out.push_back({toQt(d.namatopik), d.jumlahinteraksi});
+        if (d.isEmpty) break;
+        out.push_back({ toQt(d.namatopik), d.jumlahinteraksi });
     }
     return out;
 }
 
-QStringList SocialMedia::extractHashtags(const QString &content)
-{
+// ─────────────────────────────────────────────────────────
+//  Helpers
+// ─────────────────────────────────────────────────────────
+
+QStringList SocialMedia::extractHashtags(const QString& content) {
     QStringList tags;
     QRegularExpression re("#([A-Za-z0-9_]+)");
     auto it = re.globalMatch(content);
-    while (it.hasNext())
-    {
+    while (it.hasNext()) {
         auto match = it.next();
         QString tag = "#" + match.captured(1).toLower();
-        if (!tags.contains(tag))
-            tags.append(tag);
+        if (!tags.contains(tag)) tags.append(tag);
     }
     return tags;
 }
 
-void SocialMedia::seedDemoData()
-{
-    if (!users_.isEmpty())
-        return;
+// ─────────────────────────────────────────────────────────
+//  Seed Demo Data
+// ─────────────────────────────────────────────────────────
+
+void SocialMedia::seedDemoData() {
+    if (!users_.isEmpty()) return;
     registerUser("haikal", "12345");
     registerUser("dzaky", "12345");
-    registerUser("nala", "12345");
+    registerUser("rayyan", "12345");
+    registerUser("akmal", "12345");
 
-    registerUser("fassaha", "12345");
-    registerUser("hasya", "12345");
-    registerUser("rafael", "12345");
-    registerUser("justin", "12345");
-    registerUser("athar", "12345");
-    registerUser("aisha", "12345");
-    registerUser("kaila", "12345");
-    registerUser("shafira", "12345");
-    registerUser("rasya", "12345");
-    registerUser("renata", "12345");
-    registerUser("fayha", "12345");
-    registerUser("syifa", "12345");
-    registerUser("nafarrel", "12345");
-    registerUser("yunus", "12345");
-    registerUser("aliyyah", "12345");
-    registerUser("silka", "12345");
-    registerUser("jasmine", "12345");
-    registerUser("hafidz", "12345");
-    registerUser("sherin", "12345");
-    registerUser("mufid", "12345");
-    registerUser("fikri", "12345");
-    registerUser("salsa", "12345");
-    registerUser("kayla", "12345");
-    registerUser("adrian", "12345");
-    registerUser("mikko", "12345");
-    registerUser("farrel", "12345");
-    registerUser("steven", "12345");
+    updateProfile("haikal", "Mahasiswa Informatika - suka struktur data 🌳", "🧠");
+    updateProfile("dzaky",  "Backend engineer wannabe", "🚀");
+    updateProfile("rayyan", "UI/UX enthusiast", "🎨");
+    updateProfile("akmal",  "Dosen mata kuliah Struktur Data", "👨‍🏫");
 
-    updateProfile("haikal", "Mahasiswa Informatika - suka struktur data", "🧠");
-    updateProfile("dzaky", "Backend engineer dan pecinta clean code", "🚀");
-    updateProfile("nala", "Data science enthusiast", "📊");
+    followUser("haikal", "dzaky");
+    followUser("haikal", "rayyan");
+    followUser("dzaky",  "rayyan");
+    followUser("dzaky",  "akmal");
+    followUser("rayyan", "haikal");
+    followUser("rayyan", "akmal");
 
-    updateProfile("fassaha", "Mahasiswa informatika dan pecinta matematika", "📚");
-    updateProfile("hasya", "Suka desain dan ilustrasi digital", "🎨");
-    updateProfile("rafael", "Penggemar teknologi dan startup", "💡");
-    updateProfile("justin", "Belajar web development", "💻");
-    updateProfile("athar", "Competitive programming enthusiast", "🏆");
-    updateProfile("aisha", "Suka membaca dan menulis", "✍️");
-    updateProfile("kaila", "UI/UX learner", "🖌️");
-    updateProfile("shafira", "Data enthusiast", "📈");
-    updateProfile("rasya", "Pecinta game dan teknologi", "🎮");
-    updateProfile("renata", "Frontend developer", "🌸");
-    updateProfile("fayha", "Machine learning beginner", "🤖");
-    updateProfile("syifa", "Aktif di organisasi kampus", "🌟");
-    updateProfile("nafarrel", "Cloud computing enthusiast", "☁️");
-    updateProfile("yunus", "Problem solver", "🧩");
-    updateProfile("aliyyah", "Suka fotografi", "📷");
-    updateProfile("silka", "Belajar mobile development", "📱");
-    updateProfile("jasmine", "Content creator", "🎥");
-    updateProfile("hafidz", "Cybersecurity enthusiast", "🔐");
-    updateProfile("sherin", "Pecinta buku dan kopi", "☕");
-    updateProfile("mufid", "Backend developer", "⚙️");
-    updateProfile("fikri", "Open source contributor", "❤️");
-    updateProfile("salsa", "Frontend enthusiast", "💜");
-    updateProfile("kayla", "Visual designer", "✨");
-    updateProfile("adrian", "Software engineering learner", "🛠️");
-    updateProfile("mikko", "Database enthusiast", "🗄️");
-    updateProfile("farrel", "AI enthusiast", "🧠");
-    updateProfile("steven", "Linux enthusiast", "🐧");
+    addPost("akmal",  "Selamat datang di kelas Struktur Data minggu ini! #strukturdata #linkedlist");
+    addPost("haikal", "Hari ini ngoding doubly linked list. Mind-blown 🤯 #strukturdata #cpp");
+    addPost("dzaky",  "Priority queue itu seru banget buat antrian pasien 🏥 #priorityqueue #strukturdata");
+    addPost("rayyan", "UI Qt makin mantap setelah belajar QStackedWidget. #qt #ui");
+    addPost("haikal", "Lagi cobain bikin sosmed pakai Qt! 🤩 #qt #project");
 
-    followUser("fassaha", "dzaky");
-    followUser("fassaha", "nala");
-    followUser("fassaha", "athar");
+    toggleLike("dzaky",  1);
+    toggleLike("haikal", 1);
+    toggleLike("rayyan", 2);
+    toggleLike("akmal",  2);
+    toggleLike("dzaky",  5);
 
-    followUser("hasya", "renata");
-    followUser("hasya", "salsa");
-    followUser("hasya", "kayla");
+    addComment("dzaky",  1, "Siap pak, semangat!");
+    addComment("haikal", 1, "Sudah baca materinya, top!");
+    addComment("akmal",  5, "Mantap, jangan lupa kumpulkan ya.");
 
-    followUser("rafael", "haikal");
-    followUser("rafael", "dzaky");
-    followUser("rafael", "farrel");
-
-    followUser("justin", "haikal");
-    followUser("justin", "rafael");
-    followUser("justin", "adrian");
-
-    followUser("athar", "yunus");
-    followUser("athar", "fikri");
-    followUser("athar", "dzaky");
-
-    followUser("aisha", "hasya");
-    followUser("aisha", "jasmine");
-    followUser("aisha", "sherin");
-
-    followUser("kaila", "renata");
-    followUser("kaila", "salsa");
-    followUser("kaila", "kayla");
-
-    followUser("shafira", "fayha");
-    followUser("shafira", "farrel");
-    followUser("shafira", "haikal");
-
-    followUser("rasya", "athar");
-    followUser("rasya", "rafael");
-    followUser("rasya", "haikal");
-
-    followUser("renata", "hasya");
-    followUser("renata", "kaila");
-    followUser("renata", "salsa");
-
-    followUser("fayha", "farrel");
-    followUser("fayha", "shafira");
-    followUser("fayha", "nala");
-
-    followUser("syifa", "aisha");
-    followUser("syifa", "renata");
-    followUser("syifa", "jasmine");
-
-    followUser("nafarrel", "haikal");
-    followUser("nafarrel", "mufid");
-    followUser("nafarrel", "dzaky");
-
-    followUser("yunus", "fikri");
-    followUser("yunus", "athar");
-    followUser("yunus", "haikal");
-
-    followUser("aliyyah", "hasya");
-    followUser("aliyyah", "renata");
-    followUser("aliyyah", "kayla");
-
-    followUser("silka", "adrian");
-    followUser("silka", "justin");
-    followUser("silka", "renata");
-
-    followUser("jasmine", "hasya");
-    followUser("jasmine", "aisha");
-    followUser("jasmine", "kayla");
-
-    followUser("hafidz", "haikal");
-    followUser("hafidz", "fikri");
-    followUser("hafidz", "steven");
-
-    followUser("sherin", "hasya");
-    followUser("sherin", "aliyyah");
-    followUser("sherin", "jasmine");
-
-    followUser("mufid", "haikal");
-    followUser("mufid", "nafarrel");
-    followUser("mufid", "mikko");
-
-    followUser("fikri", "hafidz");
-    followUser("fikri", "athar");
-    followUser("fikri", "yunus");
-
-    followUser("salsa", "hasya");
-    followUser("salsa", "kayla");
-    followUser("salsa", "kaila");
-
-    followUser("kayla", "hasya");
-    followUser("kayla", "renata");
-    followUser("kayla", "salsa");
-
-    followUser("adrian", "haikal");
-    followUser("adrian", "justin");
-    followUser("adrian", "dzaky");
-
-    followUser("mikko", "mufid");
-    followUser("mikko", "dzaky");
-    followUser("mikko", "haikal");
-
-    followUser("farrel", "nala");
-    followUser("farrel", "fayha");
-    followUser("farrel", "shafira");
-
-    followUser("steven", "fikri");
-    followUser("steven", "haikal");
-    followUser("steven", "dzaky");
-
-    addPost("haikal", "Hari ini belajar AVL Tree 🌳 #strukturdata");
-    addPost("haikal", "Qt ternyata menyenangkan untuk membuat GUI 🤩");
-    addPost("haikal", "Lagi debugging linked list selama 2 jam 😭 #cpp");
-
-    addPost("dzaky", "Sedang merapikan REST API project 🚀");
-    addPost("dzaky", "Clean code membuat hidup lebih tenang ☕");
-    addPost("dzaky", "Caching berhasil mengurangi response time 🔥");
-
-    addPost("nala", "Eksperimen model klasifikasi data 📊");
-    addPost("nala", "Belajar visualisasi data menggunakan Python 📈");
-    addPost("nala", "Dataset baru untuk proyek machine learning ✨");
-
-    addPost("fassaha", "Matematika diskrit ternyata seru 📚");
-    addPost("fassaha", "Graph theory bikin penasaran 🌐");
-    addPost("fassaha", "Belajar kombinatorika malam ini 🔢");
-    addPost("hasya", "Lagi membuat ilustrasi baru 🎨");
-    addPost("rafael", "Ide startup muncul tengah malam 💡");
-    addPost("rafael", "Mencari co-founder untuk project baru 🚀");
-    addPost("rafael", "Pitch deck akhirnya selesai 🎯");
-    addPost("justin", "Belajar React hari ini 💻");
-    addPost("athar", "Berhasil AC soal DP yang sulit 🏆");
-    addPost("athar", "Ngulik shortest path hari ini 🛣️");
-    addPost("athar", "Codeforces malam ini let's go 🔥");
-    addPost("aisha", "Menyelesaikan satu buku minggu ini ✍️");
-    addPost("kaila", "Redesign halaman login aplikasi 🖌️");
-    addPost("shafira", "Data cleaning lebih lama dari modeling 😅");
-    addPost("rasya", "Main game sambil belajar logika 🎮");
-    addPost("renata", "Membuat landing page responsif 🌸");
-    addPost("renata", "Eksplorasi desain dashboard baru 🎨");
-    addPost("renata", "Belajar animasi CSS untuk UI ✨");
-    addPost("fayha", "Pertama kali training model ML 🤖");
-    addPost("syifa", "Rapat organisasi berjalan lancar 🌟");
-    addPost("nafarrel", "Deploy aplikasi ke cloud ☁️");
-    addPost("yunus", "Algoritma hari ini cukup menantang 🧩");
-    addPost("aliyyah", "Hasil foto sunset hari ini 📷");
-    addPost("silka", "Belajar Flutter layout 📱");
-    addPost("jasmine", "Upload video baru 🎥");
-    addPost("hafidz", "Belajar hashing dan enkripsi 🔐");
-    addPost("hafidz", "Mencoba CTF sederhana hari ini 💻");
-    addPost("hafidz", "Cybersecurity semakin menarik 🚨");
-    addPost("sherin", "Ngopi sambil baca buku favorit ☕");
-    addPost("mufid", "Optimasi query database ⚙️");
-    addPost("mufid", "Belajar indexing untuk performa lebih baik 🚀");
-    addPost("fikri", "PR open source diterima ❤️");
-    addPost("fikri", "Berhasil memperbaiki bug pertama di project komunitas 🎉");
-    addPost("salsa", "Eksplorasi animasi CSS 💜");
-    addPost("kayla", "Membuat palet warna baru ✨");
-    addPost("adrian", "Belajar design pattern 🛠️");
-    addPost("mikko", "Normalisasi database selesai 🗄️");
-    addPost("farrel", "Mencoba AI image generation 🧠");
-    addPost("farrel", "Prompt engineering ternyata seru 🤖");
-    addPost("steven", "Install distro Linux baru 🐧");
-
-    sendMessage("haikal", "dzaky", "Bro, backend project gimana?");
-    sendMessage("dzaky", "haikal", "Lagi beresin endpoint terakhir.");
-
-    sendMessage("nala", "haikal", "Dataset yang kemarin masih ada?");
-    sendMessage("haikal", "nala", "Masih, nanti aku kirim.");
-
-    sendMessage("hafidz", "dzaky", "Ada referensi belajar API?");
-    sendMessage("dzaky", "hafidz", "Coba mulai dari dokumentasi Express.");
-
-    sendMessage("shafira", "nala", "Kamu pakai library apa buat visualisasi?");
-    sendMessage("nala", "shafira", "Biasanya matplotlib dan seaborn.");
-
-    sendMessage("renata", "salsa", "Boleh review desain landing page?");
-    sendMessage("salsa", "renata", "Boleh, kirim aja.");
-
-    sendMessage("athar", "yunus", "Sudah coba soal graph terbaru?");
-    sendMessage("yunus", "athar", "Sudah, lumayan tricky.");
-
-    sendMessage("mufid", "haikal", "Besok jadi presentasi?");
-    sendMessage("haikal", "mufid", "Jadi, jam 9 pagi.");
-
-    sendMessage("steven", "hafidz", "Rekomendasi distro Linux?");
-    sendMessage("hafidz", "steven", "Fedora atau Ubuntu dulu aja.");
+    sendMessage("haikal", "dzaky", "Bro, udah ngerjain tugas struktur data?");
+    sendMessage("dzaky",  "haikal", "Belum, lagi baca slide-nya nih");
+    sendMessage("haikal", "dzaky", "Nanti malam ngerjain bareng yuk");
 }

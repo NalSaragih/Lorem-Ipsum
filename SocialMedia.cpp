@@ -397,7 +397,7 @@ int SocialMedia::addPost(const QString &author, const QString &content)
 
     pushBackPost(postsHead_, postsTail_, postsSize_, p);
 
-    lorem::(toStd(author), toStd(p->ctambahpostinganontent));
+    feed::tambahpostingan(toStd(author), toStd(p->content));
     pushUserAction(author, UserAction::ActPost, p->id);
 
     for (const auto &t : extractHashtags(content))

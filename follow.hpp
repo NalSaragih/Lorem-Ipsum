@@ -7,18 +7,18 @@ namespace graph {
 struct nodefollow {
     std::string usertujuan;
     nodefollow* next;
-} // namespace graph;
+};
 
 struct nodeuser {
     std::string username;
     nodefollow* daftarfollow;
     nodeuser*   next;
-} // namespace graph;
+};
 
 struct displaylist {
     std::string username;
     bool        isEnd;
-} // namespace graph;
+};
 
 void initgraph();
 void resetgraph();

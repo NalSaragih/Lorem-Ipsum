@@ -401,7 +401,7 @@ int SocialMedia::addPost(const QString &author, const QString &content)
     pushUserAction(author, UserAction::ActPost, p->id);
 
     for (const auto &t : extractHashtags(content))
-        trending::updatetrending(toStd(t), 2);
+        trending::updatetrending(toStd(t), 0);
 
     return p->id;
 }
@@ -467,6 +467,25 @@ QVector<Post *> SocialMedia::getPostsBy(const QString &user) const
     return out;
 }
 
+QVector<Post *> SocialMedia::getPostsByHashtag(const QString &hashtag) const
+{
+    QVector<Post *> out;
+    QString tag = hashtag.trimmed().toLower();
+    if (tag.isEmpty())
+        return out;
+    if (!tag.startsWith('#'))
+        tag.prepend('#');
+
+    PostNode *cur = postsTail_;
+    while (cur)
+    {
+        if (extractHashtags(cur->data->content).contains(tag))
+            out.push_back(cur->data);
+        cur = cur->prev;
+    }
+    return out;
+}
+
 Post *SocialMedia::findPost(int postId) const
 {
     PostNode *cur = postsHead_;
@@ -501,8 +520,27 @@ bool SocialMedia::deletePost(int postId, const QString &actor)
     if (p->author != actor)
         return false;
 
-    for (const auto &t : extractHashtags(p->content))
-        trending::updatetrending(toStd(t), -(2 + (int)p->likedBy.size()));
+    const QStringList tags = extractHashtags(p->content);
+    const int likeCount = p->likedBy.size();
+    auto hasOtherPostWithTag = [this, postId](const QString &tag)
+    {
+        for (PostNode *cur = postsHead_; cur; cur = cur->next)
+        {
+            if (!cur->data || cur->data->id == postId)
+                continue;
+            if (extractHashtags(cur->data->content).contains(tag))
+                return true;
+        }
+        return false;
+    };
+
+    for (const auto &t : tags)
+    {
+        if (hasOtherPostWithTag(t))
+            trending::updatetrending(toStd(t), -likeCount);
+        else
+            trending::hapustrending(toStd(t));
+    }
 
     for (const auto &liker : p->likedBy)
         if (liker != actor)
@@ -526,25 +564,24 @@ int SocialMedia::toggleLike(const QString &user, int postId)
     Post *p = findPost(postId);
     if (!p)
         return -1;
-    const QStringList tags = extractHashtags(p->content);
 
     if (p->likedBy.contains(user))
     {
         p->likedBy.remove(user);
-        for (const auto &t : tags)
+        for (const auto &t : extractHashtags(p->content))
             trending::updatetrending(toStd(t), -1);
         pushUserAction(user, UserAction::ActUnlike, postId);
         return 0;
     }
     p->likedBy.insert(user);
-    for (const auto &t : tags)
+    for (const auto &t : extractHashtags(p->content))
         trending::updatetrending(toStd(t), 1);
     likestack::pushlike(toStd(user), postId);
     pushUserAction(user, UserAction::ActLike, postId);
 
     if (p->author != user)
         pushNotification(p->author,
-                         QStringLiteral("%1 menyukai postinganmu").arg(user), user, "like");
+                         QStringLiteral("%1 menyukai postinganmu").arg(user), user, "like", postId);
     return 1;
 }
 
@@ -628,7 +665,7 @@ int SocialMedia::addComment(const QString &author, int postId, const QString &te
 
     if (p->author != author)
         pushNotification(p->author,
-                         QStringLiteral("%1 mengomentari postinganmu").arg(author), author, "comment");
+                         QStringLiteral("%1 mengomentari postinganmu").arg(author), author, "comment", postId);
     pushUserAction(author, UserAction::ActComment, postId);
     return c.id;
 }
@@ -839,7 +876,8 @@ NotifQueue &SocialMedia::notifFor(const QString &user)
 }
 
 void SocialMedia::pushNotification(const QString &user, const QString &text,
-                                   const QString &actor, const QString &type)
+                                   const QString &actor, const QString &type,
+                                   int postId)
 {
     if (!userExists(user))
         return;
@@ -848,6 +886,7 @@ void SocialMedia::pushNotification(const QString &user, const QString &text,
     n.text = text;
     n.actor = actor;
     n.type = type;
+    n.postId = postId;
     n.timestamp = QDateTime::currentDateTime();
     n.read = false;
     enqueueNotif(notifFor(user), n);
@@ -882,6 +921,23 @@ void SocialMedia::markAllRead(const QString &user)
     }
     for (const auto &item : buf)
         enqueueNotif(it.value(), item);
+}
+
+bool SocialMedia::markNotificationRead(const QString &user, int notificationId)
+{
+    auto it = notifs_.find(user);
+    if (it == notifs_.end())
+        return false;
+
+    for (NotifNode *cur = it.value().head; cur; cur = cur->next)
+    {
+        if (cur->data.id == notificationId)
+        {
+            cur->data.read = true;
+            return true;
+        }
+    }
+    return false;
 }
 
 int SocialMedia::unreadCount(const QString &user) const

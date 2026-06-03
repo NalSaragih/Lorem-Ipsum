@@ -69,6 +69,7 @@ struct Notification {
     QString   text;
     QString   actor;
     QString   type;
+    int       postId = -1;
     QDateTime timestamp;
     bool      read = false;
 };
@@ -126,6 +127,7 @@ public:
     QVector<Post*>   getFeedFor(const QString& user) const;
     QVector<Post*>   getDiscoverPosts(const QString& user, int limit = 6) const;
     QVector<Post*>   getPostsBy(const QString& user) const;
+    QVector<Post*>   getPostsByHashtag(const QString& hashtag) const;
     Post*            findPost(int postId) const;
     int              totalPosts() const;
     bool             deletePost(int postId, const QString& actor);
@@ -151,9 +153,11 @@ public:
     QVector<QString> getChatPartners(const QString& user) const;
 
     void                   pushNotification(const QString& user, const QString& text,
-                                            const QString& actor, const QString& type);
+                                            const QString& actor, const QString& type,
+                                            int postId = -1);
     QVector<Notification>  getNotifications(const QString& user, bool newestFirst = true) const;
     void                   markAllRead(const QString& user);
+    bool                   markNotificationRead(const QString& user, int notificationId);
     int                    unreadCount(const QString& user) const;
 
     QVector<QPair<QString,int>> getTrendingTopics(int limit = 10) const;

@@ -105,6 +105,7 @@ PostWidget::PostWidget(SocialMedia* sm,
     deleteButton_->setText("🗑");
     deleteButton_->setToolTip("Hapus post");
     deleteButton_->setFixedSize(30, 30);
+    deleteButton_->setVisible(false);
     deleteButton_->setStyleSheet(R"(
         QPushButton {
             background: transparent;
@@ -213,7 +214,8 @@ void PostWidget::rebuild() {
     nameLabel_->setText(p->author);
     timeLabel_->setText(timeAgo(p->timestamp));
     contentLabel_->setText(p->content);
-    deleteButton_->setVisible(p->author == currentUser_);
+    deleteButton_->setVisible(false);
+    deleteButton_->setEnabled(false);
 
     bool liked = p->likedBy.contains(currentUser_);
     if (liked) {
@@ -354,6 +356,11 @@ void PostWidget::onToggleComments() {
 
 void PostWidget::onDeletePost() {
     if (!sm_) return;
+    Post* p = sm_->findPost(postId_);
+    if (!p || p->author != currentUser_) {
+        deleteButton_->setVisible(false);
+        return;
+    }
     auto reply = QMessageBox::question(this, "Hapus Post",
         "Hapus post ini? Skor trending akan berkurang.",
         QMessageBox::Yes | QMessageBox::No);

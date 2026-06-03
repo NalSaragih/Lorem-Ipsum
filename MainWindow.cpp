@@ -17,6 +17,7 @@
 #include <QStackedWidget>
 #include <QTextEdit>
 #include <QTimer>
+#include <QMouseEvent>
 #include <functional>
 #include <memory>
 
@@ -52,6 +53,19 @@ static QString secondaryBtnStyle() {
         "QPushButton:hover { background:#D8DADF; }").arg(kText);
 }
 
+class ClickableFrame : public QFrame {
+public:
+    explicit ClickableFrame(QWidget* parent = nullptr) : QFrame(parent) {}
+    std::function<void()> onClicked;
+
+protected:
+    void mouseReleaseEvent(QMouseEvent* event) override {
+        if (event->button() == Qt::LeftButton && rect().contains(event->pos()) && onClicked)
+            onClicked();
+        QFrame::mouseReleaseEvent(event);
+    }
+};
+
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
     , rootStack_(new QStackedWidget(this))
@@ -76,6 +90,8 @@ MainWindow::MainWindow(QWidget* parent)
     , likeStackHeaderLabel_(new QLabel)
     , likeStackLayout_(nullptr)
     , exploreFeedLayout_(nullptr)
+    , exploreHeaderLabel_(new QLabel)
+    , exploreSubheaderLabel_(new QLabel)
     , notifListLayout_(nullptr)
     , markAllReadBtn_(new QPushButton("Tandai semua dibaca"))
     , chatList_(new QListWidget)
@@ -102,6 +118,7 @@ MainWindow::MainWindow(QWidget* parent)
     , searchResultsLayout_(nullptr)
     , searchHeader_(new QLabel) {
     for (int i = 0; i < TabCount; ++i) navButtons_[i] = nullptr;
+    currentExplorePostId_ = -1;
 
     setWindowTitle("SocialDS");
     resize(1340, 840);
@@ -614,12 +631,12 @@ QWidget* MainWindow::buildExplorePage() {
     layout->setContentsMargins(0, 0, 4, 0);
     layout->setSpacing(12);
 
-    auto* header = new QLabel("🧭  Jelajahi");
-    header->setStyleSheet("font-size:20px; font-weight:800; padding:4px 0;");
-    auto* sub = new QLabel("Semua postingan terbaru dari seluruh pengguna");
-    sub->setStyleSheet(QStringLiteral("color:%1; font-size:12px;").arg(kMuted));
-    layout->addWidget(header);
-    layout->addWidget(sub);
+    exploreHeaderLabel_->setText("🧭  Jelajahi");
+    exploreHeaderLabel_->setStyleSheet("font-size:20px; font-weight:800; padding:4px 0;");
+    exploreSubheaderLabel_->setText("Semua postingan terbaru dari seluruh pengguna");
+    exploreSubheaderLabel_->setStyleSheet(QStringLiteral("color:%1; font-size:12px;").arg(kMuted));
+    layout->addWidget(exploreHeaderLabel_);
+    layout->addWidget(exploreSubheaderLabel_);
 
     auto* scroll = new QScrollArea;
     scroll->setWidgetResizable(true);
@@ -914,6 +931,8 @@ void MainWindow::handleLogout() {
     currentUser_.clear();
     viewingProfile_.clear();
     currentChatPartner_.clear();
+    currentExploreHashtag_.clear();
+    currentExplorePostId_ = -1;
     rootStack_->setCurrentWidget(authScreen_);
 }
 
@@ -924,7 +943,7 @@ void MainWindow::switchTab(Tab tab) {
 }
 
 void MainWindow::goHome()          { switchTab(TabHome);          refreshHome(); }
-void MainWindow::goExplore()       { switchTab(TabExplore);       refreshExplore(); }
+void MainWindow::goExplore()       { currentExploreHashtag_.clear(); currentExplorePostId_ = -1; switchTab(TabExplore); refreshExplore(); }
 void MainWindow::goNotifications() { switchTab(TabNotifications); refreshNotifications(); }
 void MainWindow::goMessages()      { switchTab(TabMessages);      refreshMessages(); }
 void MainWindow::goProfile()       { viewingProfile_ = currentUser_; switchTab(TabProfile); refreshProfile(); }
@@ -933,6 +952,15 @@ void MainWindow::doSearch() {
     if (topSearchBar_->text().trimmed().isEmpty()) return;
     switchTab(TabSearch);
     refreshSearch();
+}
+
+void MainWindow::handleTrendingClick(const QString& hashtag) {
+    currentExplorePostId_ = -1;
+    currentExploreHashtag_ = hashtag.trimmed().toLower();
+    if (!currentExploreHashtag_.startsWith('#'))
+        currentExploreHashtag_.prepend('#');
+    switchTab(TabExplore);
+    refreshExplore();
 }
 
 void MainWindow::viewProfileOf(const QString& user) {
@@ -945,6 +973,34 @@ void MainWindow::startChatWith(const QString& partner) {
     currentChatPartner_ = partner;
     switchTab(TabMessages);
     refreshMessages();
+}
+
+void MainWindow::focusPost(int postId) {
+    currentExplorePostId_ = postId;
+    currentExploreHashtag_.clear();
+    switchTab(TabExplore);
+    refreshExplore();
+}
+
+void MainWindow::handleNotificationClick(const Notification& notification) {
+    if (!currentUser_.isEmpty()) {
+        sm_.markNotificationRead(currentUser_, notification.id);
+        refreshTopBar();
+    }
+
+    if (notification.type == "message" && !notification.actor.isEmpty()) {
+        startChatWith(notification.actor);
+        return;
+    }
+    if (notification.type == "follow" && !notification.actor.isEmpty()) {
+        viewProfileOf(notification.actor);
+        return;
+    }
+    if ((notification.type == "like" || notification.type == "comment") && notification.postId >= 0) {
+        focusPost(notification.postId);
+        return;
+    }
+    refreshNotifications();
 }
 
 void MainWindow::refreshAll() {
@@ -1142,7 +1198,51 @@ void MainWindow::refreshHome() {
 }
 
 void MainWindow::refreshExplore() {
-    renderPostsInto(exploreFeedLayout_, sm_.getAllPostsNewestFirst());
+    if (currentExplorePostId_ >= 0) {
+        Post* post = sm_.findPost(currentExplorePostId_);
+        exploreHeaderLabel_->setText("📝  Postingan");
+        exploreSubheaderLabel_->setText(post
+            ? QStringLiteral("Postingan dari @%1").arg(post->author)
+            : "Postingan tidak ditemukan");
+
+        if (!post) {
+            clearLayout(exploreFeedLayout_);
+            auto* empty = new QLabel("Postingan ini sudah tidak tersedia.");
+            empty->setAlignment(Qt::AlignCenter);
+            empty->setStyleSheet(QStringLiteral("color:%1; padding:32px; font-size:13px;").arg(kMuted));
+            exploreFeedLayout_->addWidget(empty);
+            exploreFeedLayout_->addStretch();
+            return;
+        }
+
+        QVector<Post*> posts;
+        posts.push_back(post);
+        renderPostsInto(exploreFeedLayout_, posts);
+        return;
+    }
+
+    if (currentExploreHashtag_.isEmpty()) {
+        exploreHeaderLabel_->setText("🧭  Jelajahi");
+        exploreSubheaderLabel_->setText("Semua postingan terbaru dari seluruh pengguna");
+        renderPostsInto(exploreFeedLayout_, sm_.getAllPostsNewestFirst());
+        return;
+    }
+
+    QVector<Post*> posts = sm_.getPostsByHashtag(currentExploreHashtag_);
+    exploreHeaderLabel_->setText(QStringLiteral("🏷️  %1").arg(currentExploreHashtag_));
+    exploreSubheaderLabel_->setText(QStringLiteral(
+        "%1 postingan memakai hashtag ini").arg(posts.size()));
+
+    if (posts.isEmpty()) {
+        clearLayout(exploreFeedLayout_);
+        auto* empty = new QLabel("Belum ada postingan untuk hashtag ini.");
+        empty->setAlignment(Qt::AlignCenter);
+        empty->setStyleSheet(QStringLiteral("color:%1; padding:32px; font-size:13px;").arg(kMuted));
+        exploreFeedLayout_->addWidget(empty);
+        exploreFeedLayout_->addStretch();
+        return;
+    }
+    renderPostsInto(exploreFeedLayout_, posts);
 }
 
 void MainWindow::refreshNotifications() {
@@ -1156,7 +1256,12 @@ void MainWindow::refreshNotifications() {
         notifListLayout_->addWidget(empty);
     }
     for (const auto& n : notifs) {
-        auto* card = new QFrame;
+        auto* card = new ClickableFrame;
+        card->setCursor(Qt::PointingHandCursor);
+        card->setToolTip("Buka tujuan notifikasi");
+        card->onClicked = [this, n]() {
+            handleNotificationClick(n);
+        };
         bool unread = !n.read;
         card->setStyleSheet(QStringLiteral(
             "QFrame { background:%1; border:1.5px solid %2; border-radius:12px; }")
@@ -1175,6 +1280,7 @@ void MainWindow::refreshNotifications() {
         iconLabel->setFixedSize(32, 32);
         iconLabel->setAlignment(Qt::AlignCenter);
         iconLabel->setStyleSheet("font-size:20px;");
+        iconLabel->setAttribute(Qt::WA_TransparentForMouseEvents);
 
         auto* textLabel = new QLabel(QStringLiteral(
             "<b style='font-size:13px;'>%1</b>"
@@ -1182,6 +1288,7 @@ void MainWindow::refreshNotifications() {
             .arg(n.text, kMuted, n.timestamp.toString("dd MMM yyyy · HH:mm")));
         textLabel->setTextFormat(Qt::RichText);
         textLabel->setWordWrap(true);
+        textLabel->setAttribute(Qt::WA_TransparentForMouseEvents);
 
         h->addWidget(iconLabel);
         h->addWidget(textLabel, 1);
@@ -1436,7 +1543,7 @@ void MainWindow::refreshRightPanel() {
         return content;
     };
 
-    auto* trendLayout = mkSection("🔥  Trending", "Diranking via Binary Search Tree");
+    auto* trendLayout = mkSection("🔥  Trending", "Skor = total like pada hashtag");
     static const char* rankColors[] = {
         "#E53E3E","#DD6B20","#D69E2E","#38A169","#3182CE","#805AD5","#D53F8C","#2B6CB0"
     };
@@ -1448,9 +1555,14 @@ void MainWindow::refreshRightPanel() {
     }
     for (int rank = 0; rank < trends.size(); ++rank) {
         const auto& t = trends[rank];
-        auto* row = new QFrame;
+        auto* row = new ClickableFrame;
+        row->setCursor(Qt::PointingHandCursor);
+        row->setToolTip(QStringLiteral("Lihat postingan dengan %1").arg(t.first));
+        row->setMinimumHeight(38);
         row->setStyleSheet(QStringLiteral(
-            "QFrame { background:%1; border:1px solid %2; border-radius:10px; }").arg(kBg, kBorder));
+            "QFrame { background:%1; border:1px solid %2; border-radius:10px; }"
+            "QFrame:hover { background:#EBF4FF; border-color:#BEE3F8; }")
+            .arg(kBg, kBorder));
         auto* rl = new QHBoxLayout(row);
         rl->setContentsMargins(10, 7, 10, 7);
         rl->setSpacing(10);
@@ -1465,9 +1577,15 @@ void MainWindow::refreshRightPanel() {
         auto* scoreLabel = new QLabel(QStringLiteral("%1").arg(t.second));
         scoreLabel->setStyleSheet(QStringLiteral(
             "color:%1; font-size:10px; background:transparent;").arg(kMuted));
+        chip->setAttribute(Qt::WA_TransparentForMouseEvents);
+        topicLabel->setAttribute(Qt::WA_TransparentForMouseEvents);
+        scoreLabel->setAttribute(Qt::WA_TransparentForMouseEvents);
         rl->addWidget(chip);
         rl->addWidget(topicLabel, 1);
         rl->addWidget(scoreLabel);
+        row->onClicked = [this, hashtag = t.first]() {
+            handleTrendingClick(hashtag);
+        };
         trendLayout->addWidget(row);
     }
 

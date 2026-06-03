@@ -41,6 +41,7 @@ private slots:
 
     void handleCreatePost();
     void handleUndoLike();
+    void handleTrendingClick(const QString& hashtag);
 
     void handleEditProfile();
     void handleProfileFollowToggle();
@@ -70,6 +71,8 @@ private:
     void switchTab(Tab tab);
     void viewProfileOf(const QString& user);
     void startChatWith(const QString& partner);
+    void focusPost(int postId);
+    void handleNotificationClick(const Notification& notification);
     void refreshAll();
     void refreshHome();
     void refreshExplore();
@@ -92,6 +95,8 @@ private:
     QString currentUser_;
     QString viewingProfile_;
     QString currentChatPartner_;
+    QString currentExploreHashtag_;
+    int currentExplorePostId_;
 
     QStackedWidget* rootStack_;
 
@@ -122,6 +127,8 @@ private:
     QVBoxLayout* likeStackLayout_;
 
     QVBoxLayout* exploreFeedLayout_;
+    QLabel*      exploreHeaderLabel_;
+    QLabel*      exploreSubheaderLabel_;
 
     QVBoxLayout* notifListLayout_;
     QPushButton* markAllReadBtn_;

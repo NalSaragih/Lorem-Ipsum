@@ -94,7 +94,7 @@ void updatetrending(std::string namatopik, int delta) {
     if (found != nullptr) {
         root = removeNode(root, namatopik, found->jumlahinteraksi);
     }
-    if (newScore > 0) {
+    if (newScore >= 0) {
         tambahtrending(namatopik, newScore);
     }
 }
@@ -148,7 +148,7 @@ displaytree lihatselanjutnyatrending() {
 void cetakrekursif(nodeTree* current) {
     if (current == nullptr) return;
     cetakrekursif(current->kanan);
-    std::cout << "#" << current->namaTopik << " (" << current->jumlahinteraksi << " interaksi)" << std::endl;
+    std::cout << "#" << current->namaTopik << " (" << current->jumlahinteraksi << " like)" << std::endl;
     cetakrekursif(current->kiri);
 }
 

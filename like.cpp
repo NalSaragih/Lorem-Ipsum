@@ -1,6 +1,6 @@
 #include "like.hpp"
 
-namespace lorem {
+namespace likestack {
 
 static nodeuserlike* listUserLike = nullptr;
 
@@ -101,4 +101,4 @@ void resetlike() {
     listUserLike = nullptr;
 }
 
-}
+} // namespace likestack

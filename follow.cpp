@@ -1,6 +1,6 @@
 #include "follow.hpp"
 
-namespace lorem {
+namespace graph {
 
 static nodeuser*   Follow         = nullptr;
 static nodefollow* currentfollow  = nullptr;
@@ -142,4 +142,4 @@ void resetgraph() {
     currentfollow = nullptr;
 }
 
-}
+} // namespace graph

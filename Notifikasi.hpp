@@ -1,7 +1,7 @@
 #pragma once
 #include <string>
 
-namespace lorem {
+namespace notif {
 
 struct nodeNotifikasi{
     std :: string username;
@@ -22,4 +22,4 @@ displayNotif lihatNotif();
 displayNotif bacanotif();
 bool checkEmpty();
 
-}
+} // namespace notif

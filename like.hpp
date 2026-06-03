@@ -1,7 +1,7 @@
 #pragma once
 #include <string>
 
-namespace lorem {
+namespace likestack {
 
 struct nodelike {
     int postId;
@@ -28,4 +28,4 @@ displaylike peeklike(std::string username);
 bool isLikeEmpty(std::string username);
 int  sizeLike(std::string username);
 
-}
+} // namespace likestack

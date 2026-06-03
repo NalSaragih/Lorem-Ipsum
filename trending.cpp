@@ -1,7 +1,7 @@
 #include "trending.hpp"
 #include <iostream>
 
-namespace lorem {
+namespace trending {
 
 static nodeTree*    root = nullptr;
 static trendingIter iter;
@@ -160,4 +160,4 @@ void tampilkansemuatrending() {
     cetakrekursif(root);
 }
 
-}
+} // namespace trending

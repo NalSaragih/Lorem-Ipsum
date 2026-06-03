@@ -1,7 +1,7 @@
 #pragma once
 #include <string>
 
-namespace lorem {
+namespace chat {
 
 struct nodechat{
     std :: string namapengirim;
@@ -21,4 +21,4 @@ void hapusriwayat();
 void mulaibaca();
 displaychat bacaselanjutnya();
 
-}
+} // namespace chat

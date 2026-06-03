@@ -1,6 +1,6 @@
 #include "chat.hpp"
 
-namespace lorem {
+namespace chat {
 
 nodechat* head = nullptr;
 nodechat* tail = nullptr;
@@ -61,4 +61,4 @@ displaychat bacaselanjutnya(){
     return kirimdata;
 }
 
-}
+} // namespace chat

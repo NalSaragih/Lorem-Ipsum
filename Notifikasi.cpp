@@ -1,6 +1,6 @@
 #include "Notifikasi.hpp"
 
-namespace lorem
+namespace notif
 {
 
     static nodeNotifikasi *head = nullptr;
@@ -72,4 +72,4 @@ namespace lorem
         return dibaca;
     }
 
-}
+} // namespace notif

@@ -1,7 +1,7 @@
 #pragma once
 #include <string>
 
-namespace lorem {
+namespace feed {
 
 struct nodepost{
     std :: string username;
@@ -22,4 +22,4 @@ displaypost refreshview();
 displaypost scrollbawah();
 displaypost scrollatas();
 
-}
+} // namespace feed

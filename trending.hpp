@@ -1,7 +1,7 @@
 #pragma once
 #include <string>
 
-namespace lorem {
+namespace trending {
 
 struct nodeTree {
     std::string namaTopik;
@@ -37,4 +37,4 @@ displaytree lihatselanjutnyatrending();
 void cetakrekursif(nodeTree* current);
 void tampilkansemuatrending();
 
-}
+} // namespace trending

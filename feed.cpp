@@ -1,6 +1,6 @@
 #include "feed.hpp"
 
-namespace lorem {
+namespace feed {
 
 static nodepost* head = nullptr;
 static nodepost* tail = nullptr;
@@ -61,4 +61,4 @@ displaypost scrollatas(){
     return getDisplaydata();
 }
 
-}
+} // namespace feed

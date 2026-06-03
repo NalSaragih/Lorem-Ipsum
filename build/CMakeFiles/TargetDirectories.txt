@@ -1,0 +1,5 @@
+/Users/haikalmuzhoffar/KULIAH/SocialMediaQt/Lorem-Ipsum/build/CMakeFiles/SocialMediaQt.dir
+/Users/haikalmuzhoffar/KULIAH/SocialMediaQt/Lorem-Ipsum/build/CMakeFiles/edit_cache.dir
+/Users/haikalmuzhoffar/KULIAH/SocialMediaQt/Lorem-Ipsum/build/CMakeFiles/rebuild_cache.dir
+/Users/haikalmuzhoffar/KULIAH/SocialMediaQt/Lorem-Ipsum/build/CMakeFiles/SocialMediaQt_autogen_timestamp_deps.dir
+/Users/haikalmuzhoffar/KULIAH/SocialMediaQt/Lorem-Ipsum/build/CMakeFiles/SocialMediaQt_autogen.dir

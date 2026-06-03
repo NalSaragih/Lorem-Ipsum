@@ -1,0 +1,2 @@
+set(__QT_DEPLOY_TARGET_SocialMediaQt_FILE /Users/haikalmuzhoffar/KULIAH/SocialMediaQt/Lorem-Ipsum/build/SocialMediaQt)
+set(__QT_DEPLOY_TARGET_SocialMediaQt_TYPE EXECUTABLE)
